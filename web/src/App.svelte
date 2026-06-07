@@ -4,6 +4,7 @@
   import { avatarMode, layout, images } from './lib/stores.js';
   import AgentTile from './lib/AgentTile.svelte';
   import ActionImages from './lib/ActionImages.svelte';
+  import Hierarchy from './lib/Hierarchy.svelte';
 
   let agents = $state([]);
   let projects = $state([]);
@@ -120,6 +121,8 @@
       {/each}
     </div>
   {/if}
+
+  <Hierarchy agents={shown} />
 </div>
 
 <style>
