@@ -1,25 +1,51 @@
 #!/usr/bin/env node
-// Hivemind — hook emitter (+ operator command return channel).
+// Hivemind — hook emitter (+ operator command return channel + last-message capture).
 //
-// Reads a Claude Code hook payload from stdin, forwards it to the bridge's
-// /api/hook endpoint, and — if the bridge has a queued operator command for
-// this session — prints the corresponding hook-control JSON to stdout so the
-// running agent acts on it:
-//   • Stop event + queued 'message' -> {"decision":"block","reason": "<text>"}
-//       (the agent doesn't stop; it continues with the operator's instruction)
-//   • PreToolUse event + queued 'stop' -> permissionDecision "deny"
-//       (halts the next tool so a busy agent pauses)
+// Forwards each Claude Code hook payload to the bridge's /api/hook. On the Stop
+// event it also reads the last assistant message from the transcript and attaches
+// it as `_lastMessage` so the dashboard can show what the agent just said (and you
+// can reply with context). If the bridge has a queued operator command, prints the
+// hook-control JSON so the running agent acts on it.
 //
-// Never blocks Claude: if the bridge is down/slow it just exits 0 silently.
+// Never blocks Claude: any failure just exits 0 silently.
 
 const http = require('http');
+const fs = require('fs');
+
+function lastAssistantMessage(p) {
+  try {
+    const lines = fs.readFileSync(p, 'utf8').split(/\r?\n/);
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const line = lines[i].trim();
+      if (!line) continue;
+      let o; try { o = JSON.parse(line); } catch (_) { continue; }
+      const msg = o.message || o;
+      const isAssistant = o.type === 'assistant' || (msg && msg.role === 'assistant');
+      if (!isAssistant) continue;
+      const content = (msg && msg.content) || o.content;
+      let text = '';
+      if (Array.isArray(content)) text = content.filter((c) => c && c.type === 'text').map((c) => c.text).join('\n');
+      else if (typeof content === 'string') text = content;
+      if (text && text.trim()) return text.trim().slice(0, 2000);
+    }
+  } catch (_) {}
+  return '';
+}
 
 let data = '';
 process.stdin.on('data', (c) => { data += c; if (data.length > 1e6) process.stdin.destroy(); });
 process.stdin.on('error', () => process.exit(0));
 process.stdin.on('end', () => {
+  let payload = data || '{}';
+  try {
+    const obj = JSON.parse(payload);
+    if (obj && obj.hook_event_name === 'Stop' && obj.transcript_path) {
+      const lm = lastAssistantMessage(obj.transcript_path);
+      if (lm) { obj._lastMessage = lm; payload = JSON.stringify(obj); }
+    }
+  } catch (_) {}
+
   const port = process.env.AOC_PORT || 3131;
-  const payload = data || '{}';
   const req = http.request(
     {
       host: 'localhost', port, path: '/api/hook', method: 'POST',
@@ -37,19 +63,15 @@ process.stdin.on('end', () => {
             process.stdout.write(JSON.stringify({ decision: 'block', reason: d.text }));
           } else if (d && d.kind === 'pretool-deny') {
             process.stdout.write(JSON.stringify({
-              hookSpecificOutput: {
-                hookEventName: 'PreToolUse',
-                permissionDecision: 'deny',
-                permissionDecisionReason: d.text,
-              },
+              hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: d.text },
             }));
           }
-        } catch (_) { /* ignore */ }
+        } catch (_) {}
         process.exit(0);
       });
     }
   );
-  req.on('error', () => process.exit(0));   // bridge down → no-op
+  req.on('error', () => process.exit(0));
   req.on('timeout', () => { req.destroy(); process.exit(0); });
   req.end(payload);
 });

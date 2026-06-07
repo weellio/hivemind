@@ -22,6 +22,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 const readline = require('readline');
 const { createParser } = require('./parser.js');
+const https = require('https');
 
 const argPort = (() => {
   const i = process.argv.indexOf('--port');
@@ -39,7 +40,7 @@ function webRoot() {
 // ── In-memory agent registry ────────────────────────────────────────────────
 /** @type {Map<string, object>} */
 const agents = new Map();
-const VALID_STATES = ['idle', 'thinking', 'coding', 'spawning', 'reading', 'error', 'testing', 'done'];
+const VALID_STATES = ['idle', 'thinking', 'coding', 'spawning', 'reading', 'error', 'testing', 'done', 'awaiting'];
 
 // Per-project mute list (the per-project "opt-in" control): hook events from a
 // muted project are dropped. Persisted so the choice survives bridge restarts.
@@ -80,6 +81,41 @@ function takeCommand(sessionId, predicate) {
   return cmd;
 }
 
+// ── Telegram alerts (optional) ───────────────────────────────────────────────
+// When a session enters the "awaiting" state (Claude needs your input), ping
+// Telegram so you can reply from the dashboard while away. Configure via env
+// AOC_TG_TOKEN / AOC_TG_CHAT / AOC_DASH_URL, or bridge/aoc-config.json:
+//   { "telegramToken": "...", "telegramChatId": "...", "dashboardUrl": "https://..." }
+const CFG_FILE = path.join(__dirname, 'aoc-config.json');
+let cfg = {};
+try { cfg = JSON.parse(fs.readFileSync(CFG_FILE, 'utf8')); } catch (_) {}
+const TG_TOKEN = process.env.AOC_TG_TOKEN || cfg.telegramToken || '';
+const TG_CHAT = process.env.AOC_TG_CHAT || cfg.telegramChatId || '';
+const DASH_URL = process.env.AOC_DASH_URL || cfg.dashboardUrl || `http://localhost:${argPort}/`;
+const alertedAt = new Map(); // sessionId -> ts (throttle)
+
+function sendTelegram(text) {
+  if (!TG_TOKEN || !TG_CHAT) return;
+  const payload = JSON.stringify({ chat_id: TG_CHAT, text, parse_mode: 'HTML', disable_web_page_preview: true });
+  const req = https.request({
+    host: 'api.telegram.org', path: `/bot${TG_TOKEN}/sendMessage`, method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }, timeout: 4000,
+  }, (res) => res.resume());
+  req.on('error', (e) => console.error('[telegram]', e.message));
+  req.on('timeout', () => req.destroy());
+  req.end(payload);
+}
+
+function maybeAlert(root) {
+  const sid = root.sessionId || root.id;
+  const now = Date.now();
+  if (alertedAt.get(sid) && now - alertedAt.get(sid) < 60000) return; // throttle 60s/session
+  alertedAt.set(sid, now);
+  const proj = root.project || 'a session';
+  console.log(`[alert] ${proj} awaiting input`);
+  sendTelegram(`🔔 <b>Hivemind</b>\n<b>${proj}</b> needs your input.\nReply from the dashboard: ${DASH_URL}`);
+}
+
 function upsert(ev) {
   const id = String(ev.agentId);
   if (!id || id === 'undefined') return { error: 'agentId required' };
@@ -101,6 +137,7 @@ function upsert(ev) {
   if (ev.project !== undefined) existing.project = ev.project;
   if (ev.sessionId !== undefined) existing.sessionId = ev.sessionId;
   if (ev.root !== undefined) existing.root = ev.root;
+  if (ev.lastMessage !== undefined && ev.lastMessage) existing.lastMessage = ev.lastMessage;
   if (ev.detail !== undefined) existing.detail = ev.detail;
   if (ev.state !== undefined) {
     if (!VALID_STATES.includes(ev.state)) return { error: `invalid state: ${ev.state}` };
@@ -194,8 +231,13 @@ function mapHookToEvents(p) {
       return [{ ...base, agentId: subId, parentId: rootId, name: p.agent_type || 'subagent', state: 'spawning', log: 'subagent started' }];
     case 'SubagentStop':
       return [{ ...base, agentId: subId, state: 'done', log: 'subagent finished' }];
+    case 'Notification': {
+      const kind = String(p.message || p.notification_type || p.type || '').toLowerCase();
+      if (/auth|success|login/.test(kind)) return [];   // not an input request
+      return [{ ...base, agentId: rootId, root: true, name: project, state: 'awaiting', log: (p.message ? String(p.message) : 'awaiting input').slice(0, 80) }];
+    }
     case 'Stop':
-      return [{ ...base, agentId: rootId, root: true, name: project, state: 'idle', log: 'turn complete' }];
+      return [{ ...base, agentId: rootId, root: true, name: project, state: 'idle', log: 'turn complete', lastMessage: p._lastMessage }];
     case 'SessionEnd':
       return [{ ...base, agentId: rootId, root: true, name: project, state: 'idle', log: 'session ended' }];
     default:
@@ -276,8 +318,12 @@ const server = http.createServer(async (req, res) => {
     if (!body) return sendJson(res, 400, { error: 'invalid JSON' });
     const project = projectFromCwd(body.cwd);
     if (muted.has(project)) return sendJson(res, 200, { ok: true, muted: project, applied: 0 });
+    const rootKey = 'sess:' + (body.session_id || 'unknown');
+    const prevState = agents.get(rootKey) && agents.get(rootKey).state;
     const evs = mapHookToEvents(body);
     for (const ev of evs) upsert(ev);
+    const rootNow = agents.get(rootKey);
+    if (rootNow && rootNow.state === 'awaiting' && prevState !== 'awaiting') maybeAlert(rootNow);
     if (evs.length) console.log(`[hook] ${body.hook_event_name} (${project}) -> ${evs.map(e => e.agentId + ':' + (e.state || '')).join(', ')}`);
 
     // Deliver any queued operator command through the hook return channel.
