@@ -92,17 +92,23 @@ try { cfg = JSON.parse(fs.readFileSync(CFG_FILE, 'utf8')); } catch (_) {}
 const TG_TOKEN = process.env.AOC_TG_TOKEN || cfg.telegramToken || '';
 const TG_CHAT = process.env.AOC_TG_CHAT || cfg.telegramChatId || '';
 const DASH_URL = process.env.AOC_DASH_URL || cfg.dashboardUrl || `http://localhost:${argPort}/`;
-const alertedAt = new Map(); // sessionId -> ts (throttle)
+const alertedAt = new Map();        // sessionId -> ts (throttle)
+const alertMsgMap = new Map();       // telegram message_id -> sessionId (for reply routing)
+let lastAwaitingSession = null;
+let lastActiveSession = null;
 
-function sendTelegram(text) {
+function sendTelegram(text, cb) {
   if (!TG_TOKEN || !TG_CHAT) return;
   const payload = JSON.stringify({ chat_id: TG_CHAT, text, parse_mode: 'HTML', disable_web_page_preview: true });
   const req = https.request({
     host: 'api.telegram.org', path: `/bot${TG_TOKEN}/sendMessage`, method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }, timeout: 4000,
-  }, (res) => res.resume());
-  req.on('error', (e) => console.error('[telegram]', e.message));
-  req.on('timeout', () => req.destroy());
+  }, (res) => {
+    let b = ''; res.on('data', (d) => (b += d));
+    res.on('end', () => { if (cb) { try { const j = JSON.parse(b); cb(j.ok ? j.result.message_id : null); } catch (_) { cb(null); } } });
+  });
+  req.on('error', (e) => { console.error('[telegram]', e.message); if (cb) cb(null); });
+  req.on('timeout', () => { req.destroy(); if (cb) cb(null); });
   req.end(payload);
 }
 
@@ -111,9 +117,69 @@ function maybeAlert(root) {
   const now = Date.now();
   if (alertedAt.get(sid) && now - alertedAt.get(sid) < 60000) return; // throttle 60s/session
   alertedAt.set(sid, now);
+  lastAwaitingSession = sid;
   const proj = root.project || 'a session';
   console.log(`[alert] ${proj} awaiting input`);
-  sendTelegram(`🔔 <b>Hivemind</b>\n<b>${proj}</b> needs your input.\nReply from the dashboard: ${DASH_URL}`);
+  sendTelegram(
+    `🔔 <b>Hivemind</b>\n<b>${proj}</b> needs your input.\nReply to this message to answer, or open: ${DASH_URL}`,
+    (mid) => { if (mid) alertMsgMap.set(mid, sid); }
+  );
+}
+
+function sessionByProject(name) {
+  for (const a of agents.values()) if (a.root && (a.project || '') === name && a.sessionId) return a.sessionId;
+  return null;
+}
+
+// Inbound Telegram replies -> operator commands (two-way control).
+// Needs a bot WITHOUT a webhook (getUpdates 409s otherwise) — set telegramReplyToken
+// in aoc-config.json to a dedicated bot if your main bot has a webhook.
+function handleTgMessage(m) {
+  if (!m || !m.text || String(m.chat.id) !== String(TG_CHAT)) return;
+  const text = m.text.trim();
+  let sessionId = null;
+  const replyId = m.reply_to_message && m.reply_to_message.message_id;
+  if (replyId && alertMsgMap.has(replyId)) sessionId = alertMsgMap.get(replyId);
+  let type = 'message', payload = text;
+  if (/^\/stop\b/i.test(text)) { type = 'stop'; payload = ''; }
+  const tagged = text.match(/^@?([\w.-]+)\s*:\s*([\s\S]+)$/);
+  if (!sessionId && tagged) { const s = sessionByProject(tagged[1]); if (s) { sessionId = s; payload = tagged[2]; } }
+  if (!sessionId) sessionId = lastAwaitingSession || lastActiveSession;
+  if (!sessionId) { sendTelegram('No active session to send to. Use “project: your message”.'); return; }
+  queueCommand(sessionId, type, payload);
+  const root = agents.get('sess:' + sessionId);
+  sendTelegram(`→ ${type === 'stop' ? 'STOP' : 'message'} queued for <b>${root ? root.project : sessionId}</b>`);
+}
+
+function startTelegramPolling() {
+  if (!TG_TOKEN || !TG_CHAT) return;
+  const token = cfg.telegramReplyToken || TG_TOKEN;
+  let offset = 0, warned = false;
+  const poll = () => {
+    const req = https.request(
+      { host: 'api.telegram.org', path: `/bot${token}/getUpdates?timeout=30&offset=${offset}`, method: 'GET', timeout: 40000 },
+      (res) => {
+        let b = ''; res.on('data', (d) => (b += d));
+        res.on('end', () => {
+          try {
+            const j = JSON.parse(b);
+            if (!j.ok && /webhook/i.test(j.description || '') && !warned) {
+              warned = true;
+              console.error('[telegram] reply polling blocked: this bot has a webhook. Set "telegramReplyToken" in aoc-config.json to a dedicated bot to enable Telegram replies.');
+            } else if (j.ok) {
+              for (const u of j.result) { offset = u.update_id + 1; try { handleTgMessage(u.message); } catch (_) {} }
+            }
+          } catch (_) {}
+          setTimeout(poll, 800);
+        });
+      }
+    );
+    req.on('error', () => setTimeout(poll, 3000));
+    req.on('timeout', () => { req.destroy(); setTimeout(poll, 500); });
+    req.end();
+  };
+  poll();
+  console.log('[telegram] reply polling started');
 }
 
 function upsert(ev) {
@@ -136,6 +202,7 @@ function upsert(ev) {
   if (ev.parentId !== undefined) existing.parentId = String(ev.parentId);
   if (ev.project !== undefined) existing.project = ev.project;
   if (ev.sessionId !== undefined) existing.sessionId = ev.sessionId;
+  if (ev.cwd !== undefined) existing.cwd = ev.cwd;
   if (ev.root !== undefined) existing.root = ev.root;
   if (ev.lastMessage !== undefined && ev.lastMessage) existing.lastMessage = ev.lastMessage;
   if (ev.detail !== undefined) existing.detail = ev.detail;
@@ -151,6 +218,28 @@ function upsert(ev) {
   existing.updatedAt = Date.now();
   agents.set(id, existing);
   return { ok: true, agent: existing };
+}
+
+// ── Project inspection (.claude contents) + skill copy ───────────────────────
+function listDir(p) { try { return fs.readdirSync(p, { withFileTypes: true }); } catch (_) { return []; } }
+function inspectProject(cwd) {
+  const out = { skills: [], agents: [], hooks: [] };
+  if (!cwd) return out;
+  const cd = path.join(cwd, '.claude');
+  for (const d of listDir(path.join(cd, 'skills'))) if (d.isDirectory()) out.skills.push(d.name);
+  for (const f of listDir(path.join(cd, 'commands'))) if (f.isFile() && f.name.endsWith('.md')) out.skills.push(f.name.replace(/\.md$/, ''));
+  for (const f of listDir(path.join(cd, 'agents'))) if (f.isFile() && f.name.endsWith('.md')) out.agents.push(f.name.replace(/\.md$/, ''));
+  try { const s = JSON.parse(fs.readFileSync(path.join(cd, 'settings.json'), 'utf8')); if (s.hooks) out.hooks = Object.keys(s.hooks); } catch (_) {}
+  return out;
+}
+function copySkill(fromCwd, toCwd, skill) {
+  if (!fromCwd || !toCwd || !skill) return { error: 'fromCwd, toCwd, skill required' };
+  if (/[\\/]/.test(skill) || skill.includes('..')) return { error: 'invalid skill name' };
+  const src = path.join(fromCwd, '.claude', 'skills', skill);
+  const dst = path.join(toCwd, '.claude', 'skills', skill);
+  if (!fs.existsSync(src)) return { error: 'source skill not found' };
+  try { fs.cpSync(src, dst, { recursive: true }); return { ok: true, copied: skill, to: dst }; }
+  catch (e) { return { error: e.message }; }
 }
 
 function snapshot() {
@@ -205,7 +294,7 @@ function mapHookToEvents(p) {
   const rootId = 'sess:' + sessionId;              // each session is its own root node
   const sub = p.agent_id && p.agent_id !== p.session_id;
   const subId = 'agent:' + p.agent_id;
-  const base = { project, sessionId };
+  const base = { project, sessionId, cwd: p.cwd };
   switch (p.hook_event_name) {
     case 'SessionStart':
       return [{ ...base, agentId: rootId, name: project, root: true, state: 'thinking', log: 'session started · ' + project }];
@@ -317,6 +406,7 @@ const server = http.createServer(async (req, res) => {
     const body = await readBody(req);
     if (!body) return sendJson(res, 400, { error: 'invalid JSON' });
     const project = projectFromCwd(body.cwd);
+    if (body.session_id) lastActiveSession = body.session_id;
     if (muted.has(project)) return sendJson(res, 200, { ok: true, muted: project, applied: 0 });
     const rootKey = 'sess:' + (body.session_id || 'unknown');
     const prevState = agents.get(rootKey) && agents.get(rootKey).state;
@@ -362,6 +452,26 @@ const server = http.createServer(async (req, res) => {
     return sendJson(res, r.error ? 400 : 200, r);
   }
 
+  if (url === '/api/inspect' && req.method === 'GET') {
+    const u = new URL(req.url, 'http://localhost');
+    const sidParam = u.searchParams.get('session') || '';
+    const rootId = sidParam.startsWith('sess:') ? sidParam : 'sess:' + sidParam;
+    const root = agents.get(rootId) || agents.get(sidParam);
+    const cwd = (root && root.cwd) || u.searchParams.get('cwd') || '';
+    const subagents = Array.from(agents.values())
+      .filter((a) => root && a.parentId === root.id)
+      .map((a) => ({ id: a.id, name: a.name, state: a.state }));
+    return sendJson(res, 200, { cwd, subagents, ...inspectProject(cwd) });
+  }
+
+  if (url === '/api/copy-skill' && req.method === 'POST') {
+    const body = await readBody(req);
+    if (!body) return sendJson(res, 400, { error: 'invalid JSON' });
+    const r = copySkill(body.fromCwd, body.toCwd, body.skill);
+    if (!r.error) console.log(`[copy-skill] ${body.skill}: ${body.fromCwd} -> ${body.toCwd}`);
+    return sendJson(res, r.error ? 400 : 200, r);
+  }
+
   if (url === '/api/reset' && req.method === 'POST') {
     agents.clear();
     console.log('[reset] registry cleared');
@@ -376,6 +486,7 @@ server.listen(argPort, () => {
   console.log(`Dashboard:  http://localhost:${argPort}/`);
   console.log(`Push event: POST http://localhost:${argPort}/api/event`);
   startIngest();
+  startTelegramPolling();
 });
 
 // ── Optional inline ingest ───────────────────────────────────────────────────
