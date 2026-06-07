@@ -1,0 +1,13 @@
+# Dependencies
+node_modules/
+
+# Runtime state
+bridge/aoc-mutes.json
+
+# Captured stream-json samples (regenerated on demand)
+samples/*.jsonl
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log

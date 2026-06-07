@@ -1,0 +1,19 @@
+{
+  "name": "hivemind",
+  "owner": {
+    "name": "Bworld",
+    "email": "b@bworldtools.com"
+  },
+  "metadata": {
+    "description": "Agent Ops Center — live animated dashboard for Claude Code agents.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "hivemind",
+      "source": "./",
+      "description": "Live animated dashboard of your Claude Code agents & sub-agents, driven automatically by hooks.",
+      "version": "0.1.0"
+    }
+  ]
+}
