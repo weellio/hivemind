@@ -424,11 +424,16 @@
       layout(tree, W, H);
       // frame everything once on first population so a big team isn't off-screen
       if (!autoFitted && desks.size && Array.from(desks.values()).some((d) => d.homeX != null)) { fitView(); autoFitted = true; }
-      const cooler = { x: 42, y: H - 44 }; // break destination (bottom-left)
 
       // prune desks for agents that vanished
       const live = new Set(list.map((a) => a.id));
       for (const k of desks.keys()) if (!live.has(k)) desks.delete(k);
+
+      // break area: park the water cooler below-left of ALL desks so the swarm
+      // doesn't engulf it (the cubicle grid grows right/down over a fixed spot).
+      let _minX = Infinity, _maxY = -Infinity;
+      for (const d of desks.values()) if (d.homeX != null) { if (d.homeX < _minX) _minX = d.homeX; if (d.homeY > _maxY) _maxY = d.homeY; }
+      const cooler = (_maxY === -Infinity) ? { x: 42, y: H - 44 } : { x: Math.max(40, _minX - 28), y: _maxY + 86 };
 
       // ── circuit traces from each orchestrator to its sub-agents ──
       // Octilinear (H/V + 45° corners) routed through a horizontal trunk under the
