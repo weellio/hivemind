@@ -188,21 +188,28 @@ function drawNotebook(ctx) {
 }
 
 // ── main entry ───────────────────────────────────────────────────────────────
-export function draw(ctx, agent, t) {
-  ctx.clearRect(0, 0, W * DPR, H * DPR);
-  ctx.imageSmoothingEnabled = true;
-
+// Paint the figure in the 120x100 LOGICAL space (caller sets any scale/translate).
+// Shared by the tile avatar and the Office floor view.
+//   opts.desk    : draw the desk plane behind the figure (default true)
+//   opts.walking : draw a standing, arms-swinging "walking" pose (no desk/laptop)
+export function paintFigure(ctx, agent, t, opts = {}) {
   const state = (agent && agent.state) || 'idle';
   const accent = STATE_COLORS[state] || STATE_COLORS.idle;
   const id = (agent && agent.id) || 'a';
   const shirt = (agent && agent.shirt) || SHIRTS[hash(id) % SHIRTS.length];
   const hair = HAIRS[hash(id + 'h') % HAIRS.length];
-
-  ctx.save();
-  ctx.scale(DPR, DPR);
-
   const isError = state === 'error';
-  drawDesk(ctx, accent, isError);
+
+  if (opts.walking) {
+    const sw = Math.sin(t * 0.5) * 3;          // arm swing
+    drawBody(ctx, shirt, 8);
+    drawHead(ctx, hair, 0, 8);
+    drawArm(ctx, shirt, CX - 16.5, 44, CX - 15 + sw, 62);
+    drawArm(ctx, shirt, CX + 16, 44, CX + 15 - sw, 62);
+    return;
+  }
+
+  if (opts.desk !== false) drawDesk(ctx, accent, isError);
 
   // Shoulder anchor points for the arms.
   const dyIdle = state === 'idle' ? 6 : 0; // idle leans back → figure sits lower
@@ -389,6 +396,14 @@ export function draw(ctx, agent, t) {
     ctx.fillText('z', CX + 20 + zp * 0.1, 20 - zp * 0.18);
     ctx.globalAlpha = 1;
   }
+}
 
+// Full-tile avatar: clear + scale to the hi-dpi backing store, paint with a desk.
+export function draw(ctx, agent, t) {
+  ctx.clearRect(0, 0, W * DPR, H * DPR);
+  ctx.imageSmoothingEnabled = true;
+  ctx.save();
+  ctx.scale(DPR, DPR);
+  paintFigure(ctx, agent, t, { desk: true });
   ctx.restore();
 }

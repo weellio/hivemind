@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { STATE_COLORS, STATE_LABEL } from './states.js';
+  import { paintFigure } from './avatars/desk.js';
 
   // Optional agents prop — if provided, we prefer it over self-polling.
   let { agents: agentsProp = null } = $props();
@@ -232,10 +233,12 @@
 
   // ── animation loop ──
   let raf = 0;
+  let frameN = 0;
   let walkStagger = 0; // global throttle so they don't all move at once
 
   function frame(now) {
     raf = requestAnimationFrame(frame);
+    frameN++;
     const ctx = canvas && canvas.getContext('2d');
     if (!ctx) return;
     const t = now / 1000;
@@ -316,8 +319,22 @@
           }
         }
 
-        drawPerson(ctx, drawX, drawY, scale, color, agent.name, t, d.phase, walking);
-        if (bubble) drawBubble(ctx, drawX, drawY, scale);
+        // Render with the shared top-down vector figure (+ its desk objects).
+        const fs = isRoot ? 0.58 : 0.44; // figure scale on the floor
+        ctx.save();
+        ctx.translate(drawX, drawY);
+        ctx.scale(fs, fs);
+        ctx.translate(-60, -50);
+        ctx.imageSmoothingEnabled = true;
+        paintFigure(ctx, agent, frameN, { desk: false, walking });
+        ctx.restore();
+        if (bubble) drawBubble(ctx, drawX, drawY, 1);
+        // name label below the figure
+        ctx.fillStyle = 'rgba(130,130,140,0.95)';
+        ctx.font = '10px ui-sans-serif, system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        const lbl = agent.name && agent.name.length > 16 ? agent.name.slice(0, 15) + '…' : (agent.name || '');
+        ctx.fillText(lbl, drawX, drawY + 50 * fs + 6);
 
         // small state badge for root desks
         if (isRoot) {
