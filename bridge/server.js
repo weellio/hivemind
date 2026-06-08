@@ -308,7 +308,7 @@ function execGit(cwd, args) {
 }
 
 // Safe-ish source-control helpers, invoked explicitly from the dashboard.
-async function gitAction(cwd, action, message) {
+async function gitAction(cwd, action, message, arg) {
   if (action === 'pull') { const r = await execGit(cwd, ['pull']); return { ok: r.code === 0, output: r.out }; }
   if (action === 'fetch') { const r = await execGit(cwd, ['fetch', '--all', '--prune']); return { ok: r.code === 0, output: r.out }; }
   if (action === 'commit-push') {
@@ -319,6 +319,22 @@ async function gitAction(cwd, action, message) {
     if (r.code !== 0) { return { ok: false, output: out }; } // e.g. nothing to commit
     r = await execGit(cwd, ['push']); out += '\n' + r.out;
     return { ok: r.code === 0, output: out.trim() };
+  }
+  if (action === 'diff') {
+    const stat = await execGit(cwd, ['diff', '--stat']);
+    const full = await execGit(cwd, ['diff']);
+    return { ok: true, stat: stat.out, diff: full.out.slice(0, 20000) || '(no unstaged changes)' };
+  }
+  if (action === 'branches') {
+    const cur = await execGit(cwd, ['rev-parse', '--abbrev-ref', 'HEAD']);
+    const all = await execGit(cwd, ['branch', '--format=%(refname:short)']);
+    return { ok: true, current: (cur.out || '').trim(), branches: all.out ? all.out.split('\n').map((s) => s.trim()).filter(Boolean) : [] };
+  }
+  if (action === 'checkout' || action === 'newbranch') {
+    const br = String(arg || '').trim();
+    if (!br || !/^[\w./-]+$/.test(br)) return { error: 'invalid branch name' };
+    const r = await execGit(cwd, action === 'newbranch' ? ['checkout', '-b', br] : ['checkout', br]);
+    return { ok: r.code === 0, output: r.out };
   }
   return { error: 'unknown action' };
 }
@@ -623,7 +639,7 @@ const server = http.createServer(async (req, res) => {
     const body = await readBody(req);
     if (!body || !body.cwd || !body.action) return sendJson(res, 400, { error: 'cwd and action required' });
     if (!fs.existsSync(body.cwd)) return sendJson(res, 400, { error: 'path not found' });
-    const r = await gitAction(body.cwd, body.action, body.message);
+    const r = await gitAction(body.cwd, body.action, body.message, body.arg);
     return sendJson(res, r.error ? 400 : 200, r);
   }
 

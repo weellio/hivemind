@@ -38,6 +38,39 @@
     result = j && j.ok ? `git ${action} ✓${tail}` : `git ${action} ✗${tail || ': ' + ((j && j.error) || 'failed')}`;
     busy = ''; loadGit();
   }
+
+  let diffMap = $state({});
+  let branchMap = $state({});
+  let newBranch = $state({});
+  async function gitDiff(p) {
+    if (diffMap[p.path] !== undefined) { diffMap = { ...diffMap, [p.path]: undefined }; return; }
+    busy = p.path + ':diff';
+    const j = await post('/api/git-action', { cwd: p.path, action: 'diff' });
+    diffMap = { ...diffMap, [p.path]: j && j.ok ? (j.stat ? j.stat + '\n\n' : '') + j.diff : 'error' };
+    busy = '';
+  }
+  async function gitBranches(p) {
+    if (branchMap[p.path]) { branchMap = { ...branchMap, [p.path]: undefined }; return; }
+    busy = p.path + ':br';
+    const j = await post('/api/git-action', { cwd: p.path, action: 'branches' });
+    branchMap = { ...branchMap, [p.path]: j && j.ok ? j : { branches: [], current: '' } };
+    busy = '';
+  }
+  async function refreshBranches(p) { branchMap = { ...branchMap, [p.path]: undefined }; await gitBranches(p); }
+  async function gitCheckout(p, br) {
+    busy = p.path + ':co';
+    const j = await post('/api/git-action', { cwd: p.path, action: 'checkout', arg: br });
+    result = j && j.ok ? `Switched to ${br}` : `checkout ✗ ${(j && j.output) || (j && j.error) || ''}`;
+    busy = ''; loadGit(); await refreshBranches(p);
+  }
+  async function gitNewBranch(p) {
+    const br = (newBranch[p.path] || '').trim();
+    if (!br) return;
+    busy = p.path + ':nb';
+    const j = await post('/api/git-action', { cwd: p.path, action: 'newbranch', arg: br });
+    result = j && j.ok ? `Created & switched to ${br}` : `branch ✗ ${(j && j.output) || (j && j.error) || ''}`;
+    busy = ''; newBranch = { ...newBranch, [p.path]: '' }; loadGit(); await refreshBranches(p);
+  }
   async function doCopy() {
     if (!selected || !target) return;
     const body = { type: selected.type, name: selected.name, fromCwd: selected.fromPath, toCwd: target };
@@ -94,10 +127,22 @@
                 <button class="select" onclick={() => openIn(p, 'editor')} title="Open in VS Code">Code</button>
                 {#if gitMap[p.path]?.isRepo}
                   <button class="select" onclick={() => gitDo(p, 'pull')} disabled={!!busy} title="git pull">⬇ Pull</button>
+                  <button class="select" onclick={() => gitDiff(p)} disabled={!!busy} title="git diff">Diff</button>
+                  <button class="select" onclick={() => gitBranches(p)} disabled={!!busy} title="branches">⎇ Branches</button>
                   <input class="cm" placeholder="commit message…" bind:value={commitMsg[p.path]} />
                   <button class="select" onclick={() => gitDo(p, 'commit-push')} disabled={!!busy || !gitMap[p.path].dirty} title="git add -A · commit · push">Commit & Push{#if gitMap[p.path].dirty} ({gitMap[p.path].dirty}){/if}</button>
                 {/if}
               </div>
+              {#if diffMap[p.path] !== undefined}<pre class="diff">{diffMap[p.path]}</pre>{/if}
+              {#if branchMap[p.path]}
+                <div class="branches">
+                  {#each branchMap[p.path].branches as b (b)}
+                    <button class="chip" class:sel={b === branchMap[p.path].current} onclick={() => gitCheckout(p, b)} title="git checkout {b}">{b === branchMap[p.path].current ? '● ' : ''}{b}</button>
+                  {/each}
+                  <input class="cm" placeholder="new branch…" bind:value={newBranch[p.path]} onkeydown={(e) => e.key === 'Enter' && gitNewBranch(p)} />
+                  <button class="select" onclick={() => gitNewBranch(p)} disabled={!!busy}>+ Create</button>
+                </div>
+              {/if}
               {#each GROUPS as [type, label] (type)}
                 {#if itemsOf(p, type).length}
                   <div class="grp"><span class="gl">{label}</span>
@@ -162,6 +207,10 @@
   .comps { padding: 2px 6px 10px 26px; display: flex; flex-direction: column; gap: 6px; }
   .acts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding-bottom: 6px; margin-bottom: 2px; border-bottom: 0.5px dashed var(--color-border-tertiary); }
   .acts .cm { flex: 1 1 90px; min-width: 80px; font-size: 10px; padding: 3px 6px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-tertiary); background: var(--color-background-secondary); color: var(--color-text-primary); }
+  .diff { max-height: 220px; overflow: auto; margin: 0 0 6px; padding: 7px 9px; font-family: var(--font-mono); font-size: 10px; line-height: 1.4;
+    background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); color: var(--color-text-secondary); white-space: pre; }
+  .branches { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding-bottom: 6px; }
+  .branches .cm { flex: 1 1 90px; min-width: 80px; font-size: 10px; padding: 3px 6px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-tertiary); background: var(--color-background-secondary); color: var(--color-text-primary); }
   .grp { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
   .gl { font-size: 9px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-tertiary); width: 60px; flex-shrink: 0; }
   .chip { font-size: 10px; padding: 2px 8px; border-radius: 99px; cursor: pointer; border: 0.5px solid var(--color-border-tertiary); background: var(--color-background-secondary); color: var(--color-text-primary); }
