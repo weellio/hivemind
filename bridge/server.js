@@ -576,10 +576,10 @@ const server = http.createServer(async (req, res) => {
 
   if (url === '/api/projects' && req.method === 'GET') {
     const list = projects.discover();
-    const byPath = new Map(list.map((p) => [path.resolve(p.path), p]));
+    const byPath = new Map(list.map((p) => [projects.keyOf(p.path), p]));
     for (const a of agents.values()) {
       if (!a.root || !a.cwd) continue;
-      let rp; try { rp = path.resolve(a.cwd); } catch (_) { continue; }
+      const rp = projects.keyOf(a.cwd);
       if (byPath.has(rp)) byPath.get(rp).running = true;
       else { const pr = projects.project(a.cwd); pr.running = true; pr.sources = ['session']; byPath.set(rp, pr); list.push(pr); }
     }

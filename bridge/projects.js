@@ -15,10 +15,17 @@ cfg.roots = cfg.roots || [];
 cfg.known = cfg.known || [];
 function persist() { try { fs.writeFileSync(CFG, JSON.stringify(cfg, null, 2)); } catch (_) {} }
 
+// Case-insensitive identity key for a path (Windows paths differ only by drive-letter case).
+function keyOf(p) { try { const r = path.resolve(p); return process.platform === 'win32' ? r.toLowerCase() : r; } catch (_) { return String(p || ''); } }
+
 function getConfig() { return cfg; }
 function addRoot(p) { p = String(p || '').trim(); if (p && !cfg.roots.includes(p)) { cfg.roots.push(p); persist(); } return cfg; }
 function removeRoot(p) { cfg.roots = cfg.roots.filter((r) => r !== p); persist(); return cfg; }
-function noteKnown(cwd) { if (cwd && !cfg.known.includes(cwd)) { cfg.known.push(cwd); persist(); } }
+function noteKnown(cwd) {
+  if (!cwd) return;
+  const k = keyOf(cwd);
+  if (!cfg.known.some((x) => keyOf(x) === k)) { cfg.known.push(cwd); persist(); }
+}
 
 function listDir(p) { try { return fs.readdirSync(p, { withFileTypes: true }); } catch (_) { return []; } }
 function hasClaude(dir) {
@@ -45,11 +52,12 @@ function discover() {
   const seen = new Map(); // resolved path -> project
   const add = (dir, source, requireClaude) => {
     let rp; try { rp = path.resolve(dir); } catch (_) { return; }
-    if (seen.has(rp)) { if (source) seen.get(rp).sources.push(source); return; }
+    const k = keyOf(rp);
+    if (seen.has(k)) { if (source) seen.get(k).sources.push(source); return; }
     if (requireClaude && !hasClaude(rp)) return;
     const pr = project(rp);
     if (source) pr.sources.push(source);
-    seen.set(rp, pr);
+    seen.set(k, pr);
   };
 
   // Global ~/.claude as a first-class entry.
@@ -117,4 +125,4 @@ function copyComponent(type, name, fromDir, toDir, overwrite) {
   catch (e) { return { error: e.message }; }
 }
 
-module.exports = { getConfig, addRoot, removeRoot, noteKnown, discover, project, copyComponent };
+module.exports = { getConfig, addRoot, removeRoot, noteKnown, discover, project, copyComponent, keyOf };
