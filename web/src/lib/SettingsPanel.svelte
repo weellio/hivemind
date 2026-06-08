@@ -27,7 +27,12 @@
     loading = false;
   }
 
-  function openPanel() { open = true; cfg = null; cwd = ''; rawOpen = false; status = ''; loadProjects(); loadTg(); }
+  function openPanel() { open = true; cfg = null; cwd = ''; rawOpen = false; status = ''; loadProjects(); loadTg(); loadBudget(); }
+
+  // ── cost budget (global) ──
+  let bud = $state(null); let budDaily = $state(''); let budSession = $state(''); let budStatus = $state(''); let budOpen = $state(false);
+  async function loadBudget() { try { const r = await fetch('/api/budget'); bud = await r.json(); budDaily = bud.daily ? String(bud.daily) : ''; budSession = bud.session ? String(bud.session) : ''; } catch (_) {} }
+  async function saveBudget() { budStatus = 'Saving…'; const r = await post('/api/budget', { daily: Number(budDaily) || 0, session: Number(budSession) || 0 }); if (r) { bud = r; budStatus = '✓ Saved'; } else budStatus = 'Error'; }
   function closePanel() { open = false; }
 
   // ── Telegram (global bridge config) ──
@@ -96,6 +101,22 @@
           </div>
           {#if tgStatus}<div class="tg-status">{tgStatus}</div>{/if}
           <div class="tg-hint">Make a bot with @BotFather; get your chat id from @userinfobot. Applies live — no restart.</div>
+        </div>
+      {/if}
+    </div>
+
+    <div class="tg">
+      <button class="collapser" onclick={() => (budOpen = !budOpen)}>
+        <span class="caret">{budOpen ? '▾' : '▸'}</span> Cost budget
+        {#if bud && bud.daily}<span class="tg-state">· ${bud.dailyCost?.toFixed?.(2) ?? '0'} / ${bud.daily} today</span>{/if}
+      </button>
+      {#if budOpen}
+        <div class="tg-form">
+          <input class="in" placeholder="daily cap (USD, 0 = off)" bind:value={budDaily} />
+          <input class="in" placeholder="per-session cap (USD, 0 = off)" bind:value={budSession} />
+          <div class="tg-btns"><button class="select" onclick={saveBudget}>Save</button></div>
+          {#if budStatus}<div class="tg-status">{budStatus}</div>{/if}
+          <div class="tg-hint">Alerts go to Telegram + a dashboard banner when crossed. Spend is estimated from transcripts.</div>
         </div>
       {/if}
     </div>

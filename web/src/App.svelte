@@ -83,11 +83,18 @@
         const fresh = agents.filter((a) => a.state === 'awaiting' && !prevAwaiting.has(a.id));
         if (fresh.length) { playChime(); if ($desktopNotify) fresh.forEach(notifyDesktop); }
       }
+      budget = d.budget || null;
+      if (!firstPoll && budget?.overDaily && !prevOverBudget) { playChime(); if ($desktopNotify) notifyDesktop({ name: 'Cost budget', project: `today $${budget.dailyCost.toFixed(2)} (cap $${budget.daily})` }); }
+      if (budget && !budget.overDaily) budgetDismissed = false;
+      prevOverBudget = !!budget?.overDaily;
       prevAwaiting = nowAwaiting; firstPoll = false;
       online = true;
     } catch (_) { online = false; }
   }
   let usage = $state(null);
+  let budget = $state(null);
+  let prevOverBudget = false;
+  let budgetDismissed = $state(false);
   async function pollUsage() { try { const r = await fetch('/api/usage'); usage = await r.json(); } catch (_) {} }
   let todayCost = $derived.by(() => {
     if (!usage?.byDay?.length) return null;
@@ -167,6 +174,11 @@
   {#if license.licensed === false}
     <div class="lic">⚠ Hivemind is unlicensed — {license.message || 'add your license key to bridge/aoc-config.json'}.
       <button onclick={() => (license = { licensed: true })}>Dismiss</button>
+    </div>
+  {/if}
+  {#if budget?.overDaily && !budgetDismissed}
+    <div class="lic">💸 Daily spend ${budget.dailyCost.toFixed(2)} crossed your ${budget.daily} cap.
+      <button onclick={() => (budgetDismissed = true)}>Dismiss</button>
     </div>
   {/if}
 
