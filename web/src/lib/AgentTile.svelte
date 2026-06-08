@@ -25,7 +25,7 @@
   }
 </script>
 
-<div class="tile" class:idle={agent.state === 'idle'} class:sub={!!agent.parentId} class:awaiting style="--c:{color}; --fd:{fd}s" data-id={agent.id}>
+<div class="tile" class:idle={agent.state === 'idle'} class:working={agent.state !== 'idle' && agent.state !== 'done' && !awaiting} class:sub={!!agent.parentId} class:awaiting style="--c:{color}; --fd:{fd}s" data-id={agent.id}>
   <button class="head" onclick={() => (expanded = !expanded)} title="Toggle details">
     <span class="name">{agent.parentId ? '↳ ' : ''}{agent.name}</span>
     <span class="badge">{awaiting ? '🔔 ' : ''}{STATE_LABEL[agent.state] || agent.state}</span>
@@ -73,7 +73,14 @@
   }
   @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
   @media (prefers-reduced-motion: reduce) { .tile { animation: none; } }
-  .tile.idle { opacity: 0.7; }
+  .tile.idle { opacity: 0.62; }
+  .tile.idle::after { content: ''; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none;
+    border: 1.5px dashed rgba(245, 158, 11, 0.5); animation: idleflag 2.2s ease-in-out infinite; }
+  @keyframes idleflag { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.9; } }
+  .tile.working { border-color: color-mix(in srgb, var(--c) 50%, var(--color-border-tertiary)); }
+  .tile.working::after { content: ''; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none;
+    box-shadow: 0 0 14px -1px var(--c); animation: workglow 2.4s ease-in-out infinite; }
+  @keyframes workglow { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.7; } }
   .tile.sub { margin-left: 6px; }
   .tile.awaiting { opacity: 1; border-left-color: #F59E0B; }
   .tile.awaiting::after { content: ''; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none;

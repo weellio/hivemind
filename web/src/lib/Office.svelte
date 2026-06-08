@@ -80,6 +80,13 @@
   }
 
   const ACTIVE = new Set(['spawning', 'coding', 'reading', 'thinking', 'testing']);
+  // hex (#rrggbb / #rgb) -> rgba string with alpha, for activity glows
+  function hexA(hex, a) {
+    const h = (hex || '#888888').replace('#', '');
+    const n = h.length === 3 ? h.split('').map((x) => x + x).join('') : h;
+    const r = parseInt(n.slice(0, 2), 16), g = parseInt(n.slice(2, 4), 16), b = parseInt(n.slice(4, 6), 16);
+    return `rgba(${r},${g},${b},${a})`;
+  }
   const PHRASES = ['hi', 'how are you?', 'gotta run', "where's the TPS report?", 'haha', 'coffee?', 'busy day',
     'nice work', 'ugh, bugs', 'lunch?', 'did you see that?', 'on it 👍', 'morning!', 'so close', 'standup?'];
 
@@ -485,6 +492,28 @@
 
         // Render with the shared top-down vector figure (+ its desk objects).
         const fs = isRoot ? 0.58 : 0.44; // figure scale on the floor
+
+        // ── activity highlight ─────────────────────────────────────────────
+        // Working agents get a bold pulsing glow in their state colour; idle
+        // agents get a pulsing amber "free — put me to work" ring so they pop.
+        const haloR = Math.max(28, 64 * fs);
+        if (agent.state !== 'idle' && agent.state !== 'done') {
+          const pulse = 0.5 + 0.5 * Math.sin(t * 3 + (d.seed || 0) * 6.28);
+          const g = ctx.createRadialGradient(drawX, drawY, 2, drawX, drawY, haloR);
+          g.addColorStop(0, hexA(color, 0.45 + 0.25 * pulse));
+          g.addColorStop(0.55, hexA(color, 0.16 + 0.12 * pulse));
+          g.addColorStop(1, hexA(color, 0));
+          ctx.fillStyle = g;
+          ctx.beginPath(); ctx.arc(drawX, drawY, haloR, 0, Math.PI * 2); ctx.fill();
+        } else if (agent.state === 'idle') {
+          const pulse = 0.5 + 0.5 * Math.sin(t * 2 + (d.seed || 0) * 6.28);
+          ctx.save();
+          ctx.strokeStyle = hexA('#F59E0B', 0.4 + 0.45 * pulse);
+          ctx.lineWidth = 2; ctx.setLineDash([5, 4]);
+          ctx.beginPath(); ctx.arc(drawX, drawY, haloR * 0.7, 0, Math.PI * 2); ctx.stroke();
+          ctx.restore();
+        }
+
         hitTargets.push({ id: agent.id, x: drawX, y: drawY, r: Math.max(30, 55 * fs) });
         ctx.save();
         ctx.translate(drawX, drawY);
