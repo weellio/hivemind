@@ -551,7 +551,7 @@ const server = http.createServer(async (req, res) => {
   if (url === '/api/copy-component' && req.method === 'POST') {
     const body = await readBody(req);
     if (!body) return sendJson(res, 400, { error: 'invalid JSON' });
-    const r = projects.copyComponent(body.type, body.name, body.fromCwd, body.toCwd);
+    const r = projects.copyComponent(body.type, body.name, body.fromCwd, body.toCwd, body.overwrite === true);
     if (!r.error) console.log(`[copy] ${body.type} ${body.name}: ${body.fromCwd} -> ${body.toCwd}`);
     return sendJson(res, r.error ? 400 : 200, r);
   }

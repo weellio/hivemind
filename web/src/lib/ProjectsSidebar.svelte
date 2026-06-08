@@ -17,12 +17,17 @@
   function pick(proj, type, name) { selected = { fromPath: proj.path, fromName: proj.name, type, name }; target = ''; result = ''; }
   async function doCopy() {
     if (!selected || !target) return;
-    const j = await post('/api/copy-component', { type: selected.type, name: selected.name, fromCwd: selected.fromPath, toCwd: target });
+    const body = { type: selected.type, name: selected.name, fromCwd: selected.fromPath, toCwd: target };
+    let j = await post('/api/copy-component', body);
+    if (j && j.exists) {
+      if (!confirm(`“${selected.name}” already exists in the target project. Overwrite it?`)) { result = 'Cancelled — already exists.'; return; }
+      j = await post('/api/copy-component', { ...body, overwrite: true });
+    }
     result = j && j.ok ? `Copied ${selected.type} “${selected.name}” → ${String(target).split(/[\\/]/).pop()}` : 'Error: ' + ((j && j.error) || 'failed');
     load();
   }
-  const GROUPS = [['skill', 'Skills'], ['agent', 'Agents'], ['command', 'Commands'], ['hook', 'Hooks']];
-  const itemsOf = (p, type) => type === 'skill' ? p.skills : type === 'agent' ? p.agents : type === 'command' ? p.commands : p.hooks;
+  const GROUPS = [['skill', 'Skills'], ['agent', 'Agents'], ['command', 'Commands'], ['hook', 'Hooks'], ['mcp', 'MCP']];
+  const itemsOf = (p, type) => type === 'skill' ? p.skills : type === 'agent' ? p.agents : type === 'command' ? p.commands : type === 'hook' ? p.hooks : p.mcp;
 </script>
 
 <button class="select" onclick={openPanel}>Projects</button>
@@ -63,7 +68,6 @@
                   </div>
                 {/if}
               {/each}
-              {#if p.mcp.length}<div class="grp"><span class="gl">MCP</span>{#each p.mcp as m (m)}<span class="chip dim">{m}</span>{/each}</div>{/if}
               {#if !p.skills.length && !p.agents.length && !p.commands.length && !p.hooks.length && !p.mcp.length}<div class="none">no local components</div>{/if}
             </div>
           {/if}

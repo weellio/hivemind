@@ -56,7 +56,8 @@ function discover() {
   const home = os.homedir();
   const globalClaude = path.join(home, '.claude');
   if (fs.existsSync(globalClaude)) {
-    seen.set('__global__', { path: globalClaude, name: 'Global (user)', sources: ['global'], running: false, ...componentsOf(globalClaude, globalClaude) });
+    // path = home so copyComponent(home) targets <home>/.claude (= ~/.claude)
+    seen.set('__global__', { path: home, name: 'Global (user)', sources: ['global'], running: false, ...componentsOf(globalClaude, home) });
   }
 
   // Configured roots: the root itself, and its immediate children that look like projects.
@@ -70,13 +71,14 @@ function discover() {
   return Array.from(seen.values());
 }
 
-function copyHook(fromDir, toDir, event) {
+function copyHook(fromDir, toDir, event, overwrite) {
   try {
     const src = JSON.parse(fs.readFileSync(path.join(fromDir, '.claude', 'settings.json'), 'utf8'));
     if (!src.hooks || !src.hooks[event]) return { error: 'source hook not found' };
     const tp = path.join(toDir, '.claude', 'settings.json');
     let tgt = {}; try { tgt = JSON.parse(fs.readFileSync(tp, 'utf8')); } catch (_) {}
     tgt.hooks = tgt.hooks || {};
+    if (tgt.hooks[event] && !overwrite) return { exists: true };
     tgt.hooks[event] = src.hooks[event];
     fs.mkdirSync(path.dirname(tp), { recursive: true });
     fs.writeFileSync(tp, JSON.stringify(tgt, null, 2) + '\n');
@@ -84,10 +86,25 @@ function copyHook(fromDir, toDir, event) {
   } catch (e) { return { error: e.message }; }
 }
 
-function copyComponent(type, name, fromDir, toDir) {
+function copyMcp(fromDir, toDir, name, overwrite) {
+  try {
+    const src = JSON.parse(fs.readFileSync(path.join(fromDir, '.mcp.json'), 'utf8'));
+    if (!src.mcpServers || !src.mcpServers[name]) return { error: 'source MCP server not found' };
+    const tp = path.join(toDir, '.mcp.json');
+    let tgt = {}; try { tgt = JSON.parse(fs.readFileSync(tp, 'utf8')); } catch (_) {}
+    tgt.mcpServers = tgt.mcpServers || {};
+    if (tgt.mcpServers[name] && !overwrite) return { exists: true };
+    tgt.mcpServers[name] = src.mcpServers[name];
+    fs.writeFileSync(tp, JSON.stringify(tgt, null, 2) + '\n');
+    return { ok: true, copied: name };
+  } catch (e) { return { error: e.message }; }
+}
+
+function copyComponent(type, name, fromDir, toDir, overwrite) {
   if (!type || !name || !fromDir || !toDir) return { error: 'type, name, fromCwd, toCwd required' };
   if (/[\\/]/.test(name) || name.includes('..')) return { error: 'invalid name' };
-  if (type === 'hook') return copyHook(fromDir, toDir, name);
+  if (type === 'hook') return copyHook(fromDir, toDir, name, overwrite);
+  if (type === 'mcp') return copyMcp(fromDir, toDir, name, overwrite);
   const rel = type === 'skill' ? ['skills', name]
     : type === 'agent' ? ['agents', name + '.md']
     : type === 'command' ? ['commands', name + '.md'] : null;
@@ -95,6 +112,7 @@ function copyComponent(type, name, fromDir, toDir) {
   const src = path.join(fromDir, '.claude', ...rel);
   const dst = path.join(toDir, '.claude', ...rel);
   if (!fs.existsSync(src)) return { error: 'source not found' };
+  if (fs.existsSync(dst) && !overwrite) return { exists: true };
   try { fs.mkdirSync(path.dirname(dst), { recursive: true }); fs.cpSync(src, dst, { recursive: true }); return { ok: true, copied: name }; }
   catch (e) { return { error: e.message }; }
 }
