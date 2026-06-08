@@ -373,7 +373,7 @@
               tx = cooler.x + Math.cos(ang) * 16;
               ty = cooler.y - 12 + Math.sin(ang) * 7;
               kind = 'break'; outDur = 1.3; backDur = 1.3; pause = 3 + Math.random() * 3; // hang 3–6s
-              d.nextBreakAt = t + 30 + Math.random() * 45;       // ≥30s, randomized, until next visit
+              d.nextBreakAt = t + 50 + Math.random() * 45;       // ≥50s, randomized, until next visit
             }
           } else if (!isRoot && d.parentDeskId && ACTIVE.has(agent.state) && t > d.nextWalkAt) {
             const parent = desks.get(d.parentDeskId);
