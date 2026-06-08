@@ -13,3 +13,4 @@ export const avatarMode = persisted('aoc-avatar-mode', 'pixel'); // pixel | abst
 export const layout = persisted('aoc-layout', 'office');         // office | tree | mosaic | solo | squad | warroom | broadcast
 export const images = persisted('aoc-images', []);               // pool of imported image data URLs
 export const imageMap = persisted('aoc-image-map', {});           // per-agent image: { agentKey: dataURL }
+export const soundOn = persisted('aoc-sound', true);              // chime when an agent needs input

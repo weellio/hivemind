@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { STATE_COLORS, STATE_LABEL } from './lib/states.js';
-  import { avatarMode, layout, images } from './lib/stores.js';
+  import { avatarMode, layout, images, soundOn } from './lib/stores.js';
   import AgentTile from './lib/AgentTile.svelte';
   import ActionImages from './lib/ActionImages.svelte';
   import CopySkill from './lib/CopySkill.svelte';
@@ -21,12 +21,38 @@
   let fileInput = $state();
   let license = $state({ licensed: true });
 
+  // chime when an agent newly needs input
+  let prevAwaiting = new Set();
+  let firstPoll = true;
+  let audioCtx = null;
+  function playChime() {
+    if (!$soundOn) return;
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const now = audioCtx.currentTime;
+      [880, 1175].forEach((f, i) => {
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = 'sine'; o.frequency.value = f;
+        const ts = now + i * 0.12;
+        g.gain.setValueAtTime(0.0001, ts);
+        g.gain.linearRampToValueAtTime(0.18, ts + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0008, ts + 0.26);
+        o.connect(g); g.connect(audioCtx.destination);
+        o.start(ts); o.stop(ts + 0.28);
+      });
+    } catch (_) {}
+  }
+
   async function poll() {
     try {
       const r = await fetch('/api/state', { cache: 'no-store' });
       const d = await r.json();
       agents = d.agents || [];
       projects = d.projects || [];
+      const nowAwaiting = new Set(agents.filter((a) => a.state === 'awaiting').map((a) => a.id));
+      if (!firstPoll) { for (const id of nowAwaiting) if (!prevAwaiting.has(id)) { playChime(); break; } }
+      prevAwaiting = nowAwaiting; firstPoll = false;
       online = true;
     } catch (_) { online = false; }
   }
@@ -120,6 +146,7 @@
       <input bind:this={fileInput} type="file" accept="image/*" multiple style="display:none" onchange={onFiles} />
       <ActionImages />
       <CopySkill />
+      <button class="select" onclick={() => ($soundOn = !$soundOn)} title="Alert sound when an agent needs input">{$soundOn ? '🔔' : '🔕'}</button>
       <ThemeMenu />
     </div>
   </header>

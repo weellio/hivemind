@@ -117,6 +117,7 @@ const alertedAt = new Map();        // sessionId -> ts (throttle)
 const alertMsgMap = new Map();       // telegram message_id -> sessionId (for reply routing)
 let lastAwaitingSession = null;
 let lastActiveSession = null;
+const awaitTimers = new Map();       // rootKey -> delayed-nudge timeout (Telegram after 30s unanswered)
 
 function sendTelegram(text, cb) {
   if (!TG_TOKEN || !TG_CHAT) return;
@@ -451,7 +452,19 @@ const server = http.createServer(async (req, res) => {
     const evs = mapHookToEvents(body);
     for (const ev of evs) upsert(ev);
     const rootNow = agents.get(rootKey);
-    if (rootNow && rootNow.state === 'awaiting' && prevState !== 'awaiting') maybeAlert(rootNow);
+    if (rootNow) {
+      if (rootNow.state === 'awaiting' && prevState !== 'awaiting') {
+        // entered "awaiting": nudge Telegram only if still unanswered after 30s
+        clearTimeout(awaitTimers.get(rootKey));
+        awaitTimers.set(rootKey, setTimeout(() => {
+          const r = agents.get(rootKey);
+          if (r && r.state === 'awaiting') maybeAlert(r);
+          awaitTimers.delete(rootKey);
+        }, 30000));
+      } else if (rootNow.state !== 'awaiting' && awaitTimers.has(rootKey)) {
+        clearTimeout(awaitTimers.get(rootKey)); awaitTimers.delete(rootKey);
+      }
+    }
     if (evs.length) console.log(`[hook] ${body.hook_event_name} (${project}) -> ${evs.map(e => e.agentId + ':' + (e.state || '')).join(', ')}`);
 
     // Deliver any queued operator command through the hook return channel.
@@ -486,7 +499,11 @@ const server = http.createServer(async (req, res) => {
     const body = await readBody(req);
     if (!body) return sendJson(res, 400, { error: 'invalid JSON' });
     const r = queueCommand(body.sessionId, body.type || 'message', body.text);
-    if (!r.error) console.log(`[command] ${body.sessionId} <- ${body.type || 'message'}: ${String(body.text || '').slice(0, 60)}`);
+    if (!r.error) {
+      console.log(`[command] ${body.sessionId} <- ${body.type || 'message'}: ${String(body.text || '').slice(0, 60)}`);
+      const k = 'sess:' + body.sessionId;                 // you replied → cancel the pending Telegram nudge
+      if (awaitTimers.has(k)) { clearTimeout(awaitTimers.get(k)); awaitTimers.delete(k); }
+    }
     return sendJson(res, r.error ? 400 : 200, r);
   }
 
