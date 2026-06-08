@@ -161,18 +161,20 @@
         <option value="mosaic">Mosaic</option>
       </select>
 
-      <select class="select" bind:value={$avatarMode}>
-        <option value="pixel">Pixel art</option>
-        <option value="abstract">Abstract</option>
-        <option value="desk">Desk (top-down)</option>
-        <option value="image">Your image</option>
-        <option value="gif">Image (plain, no overlay)</option>
-      </select>
+      {#if $layout !== 'office'}
+        <select class="select" bind:value={$avatarMode}>
+          <option value="pixel">Pixel art</option>
+          <option value="abstract">Abstract</option>
+          <option value="desk">Desk (top-down)</option>
+          <option value="image">Your image</option>
+          <option value="gif">Image (plain, no overlay)</option>
+        </select>
 
-      <button class="select" onclick={() => fileInput.click()} title="Import avatar images (PNG/JPG/GIF)">Images…</button>
-      {#if $images.length}<button class="select" onclick={clearImages} title="Clear imported images">✕{$images.length}</button>{/if}
+        <button class="select" onclick={() => fileInput.click()} title="Import avatar images (PNG/JPG/GIF)">Images…</button>
+        {#if $images.length}<button class="select" onclick={clearImages} title="Clear imported images">✕{$images.length}</button>{/if}
+        <ActionImages />
+      {/if}
       <input bind:this={fileInput} type="file" accept="image/*" multiple style="display:none" onchange={onFiles} />
-      <ActionImages />
 
       <div class="menu-wrap">
         <button class="select" onclick={() => { menuOpen = !menuOpen; optsOpen = false; }} title="Manage your Claude Code projects & sessions">⚙ Manage ▾</button>
