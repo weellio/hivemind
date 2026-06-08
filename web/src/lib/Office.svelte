@@ -231,6 +231,26 @@
     ctx.fillText('water', x, y + 9);
   }
 
+  // Potted plant (upright) with a gentle leaf sway. (x, y) = bottom of the pot.
+  function drawPlant(ctx, x, y, t, seed) {
+    ctx.fillStyle = '#b06a43';
+    ctx.beginPath(); ctx.moveTo(x - 6, y - 9); ctx.lineTo(x + 6, y - 9); ctx.lineTo(x + 4.5, y); ctx.lineTo(x - 4.5, y); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#9c5b38'; ctx.beginPath(); ctx.roundRect(x - 7, y - 11.5, 14, 4, 1.5); ctx.fill();      // rim
+    ctx.fillStyle = '#5b3a26'; ctx.beginPath(); ctx.ellipse(x, y - 9.5, 5.5, 1.8, 0, 0, Math.PI * 2); ctx.fill(); // soil
+    const sway = Math.sin(t * 0.03 + seed * 6) * 1.5;
+    const leaves = [[-5, -17, 5.5, '#2f8f4e'], [5, -16, 5.5, '#3aa55c'], [0, -23, 6.5, '#37a258'], [-2, -13, 4.5, '#2b7d45'], [3, -20, 4.5, '#46b766']];
+    for (const [dx, dy, r, col] of leaves) {
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.ellipse(x + dx + sway * (-dy / 23), y + dy, r * 0.82, r, 0, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  // A few decorations around the floor edges (away from the desk cluster).
+  function drawDecor(ctx, W, H, t) {
+    drawPlant(ctx, W - 30, 44, t, 0.2);
+    drawPlant(ctx, W - 38, H - 40, t, 0.7);
+    drawPlant(ctx, W * 0.6, H - 34, t, 0.45);
+  }
+
   // Small speech bubble with text (for casual peer chats).
   function drawTextBubble(ctx, x, y, text) {
     ctx.save();
@@ -353,7 +373,8 @@
       }
       ctx.restore();
 
-      drawCooler(ctx, cooler.x, cooler.y, frameN);
+      drawDecor(ctx, W, H, frameN);
+      drawCooler(ctx, cooler.x, cooler.y);
 
       // draw root desks first (under), then subs
       const drawList = [];
