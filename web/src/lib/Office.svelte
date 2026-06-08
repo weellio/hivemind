@@ -441,17 +441,19 @@
       for (const d of desks.values()) if (d.homeX != null) { if (d.homeX < _minX) _minX = d.homeX; if (d.homeX > _maxX) _maxX = d.homeX; if (d.homeY < _minY) _minY = d.homeY; }
       const cooler = (_minY === Infinity) ? { x: W / 2, y: 40 } : { x: (_minX + _maxX) / 2, y: _minY - 74 };
 
-      // ── team rooms: a soft box around each orchestrator + its workers ──
+      // ── rooms: team rooms enclose the orchestrator + its cubicle floor; solo
+      // orchestrators each get their own small private office. ──
       ctx.save();
       for (const root of tree.roots) {
         const rd = desks.get(root.id);
-        if (!rd || !rd.teamRect || !rd.teamRect.team) continue;
-        const r = rd.teamRect;
-        const bx = r.x - 12, by = r.y - 16, bw = r.w + 24, bh = r.h + 30;
+        if (!rd || !rd.teamRect) continue;
+        const r = rd.teamRect, solo = !r.team;
+        const px = solo ? 9 : 12, pt = solo ? 13 : 16, pb = solo ? 20 : 14, rad = solo ? 10 : 14;
+        const bx = r.x - px, by = r.y - pt, bw = r.w + px * 2, bh = r.h + pt + pb;
         ctx.beginPath();
-        if (ctx.roundRect) ctx.roundRect(bx, by, bw, bh, 14); else ctx.rect(bx, by, bw, bh);
-        ctx.fillStyle = 'rgba(140,152,178,0.05)'; ctx.fill();
-        ctx.strokeStyle = 'rgba(150,162,190,0.30)'; ctx.lineWidth = 1; ctx.setLineDash([]); ctx.stroke();
+        if (ctx.roundRect) ctx.roundRect(bx, by, bw, bh, rad); else ctx.rect(bx, by, bw, bh);
+        ctx.fillStyle = solo ? 'rgba(150,162,190,0.06)' : 'rgba(140,152,178,0.045)'; ctx.fill();
+        ctx.strokeStyle = solo ? 'rgba(160,172,200,0.34)' : 'rgba(150,162,190,0.28)'; ctx.lineWidth = 1; ctx.setLineDash([]); ctx.stroke();
       }
       ctx.restore();
 
