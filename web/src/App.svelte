@@ -72,7 +72,7 @@
     const added = [];
     for (const f of files) {
       const raw = await readFile(f); if (!raw) continue;
-      added.push(/gif/i.test(f.type) ? raw : (await downscale(raw, 160)) || raw);
+      added.push(/gif|svg/i.test(f.type) ? raw : (await downscale(raw, 256)) || raw);
     }
     if (added.length) { images.update((p) => [...p, ...added]); $avatarMode = 'image'; }
     e.target.value = '';
@@ -116,7 +116,7 @@
         <option value="abstract">Abstract</option>
         <option value="desk">Desk (top-down)</option>
         <option value="image">Your image</option>
-        <option value="gif">GIF (plain)</option>
+        <option value="gif">Image (plain, no overlay)</option>
       </select>
 
       <button class="select" onclick={() => fileInput.click()} title="Import avatar images (PNG/JPG/GIF)">Images…</button>

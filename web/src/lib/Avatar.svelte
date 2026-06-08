@@ -46,7 +46,7 @@
     const perState = fileInput && fileInput._perState;
     if (f && /^image\//.test(f.type)) {
       const raw = await readFile(f);
-      const ds = /gif/i.test(f.type) ? raw : (await downscale(raw, 160)) || raw;
+      const ds = /gif|svg/i.test(f.type) ? raw : (await downscale(raw, 256)) || raw;
       if (ds) {
         const mapKey = perState ? `${key}::${agent.state}` : key;
         imageMap.update((m) => ({ ...m, [mapKey]: ds }));

@@ -10,7 +10,7 @@
     const f = (e.target.files || [])[0];
     if (f && /^image\//.test(f.type)) {
       const raw = await readFile(f);
-      const ds = /gif/i.test(f.type) ? raw : (await downscale(raw, 160)) || raw;
+      const ds = /gif|svg/i.test(f.type) ? raw : (await downscale(raw, 256)) || raw;
       if (ds) imageMap.update((m) => ({ ...m, [`*::${state}`]: ds }));
     }
     e.target.value = '';
