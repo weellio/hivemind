@@ -190,74 +190,107 @@ export function draw(ctx, agent, t) {
   const lShoulder = { x: CX - 18, y: shoulderY };
   const rShoulder = { x: CX + 18, y: shoulderY };
 
-  // Always-present props (coffee only steams when idle; phone-state varies).
-  drawNotebook(ctx);
-
   // ── per-state scene composition ────────────────────────────────────────────
+  // Each branch chooses a DISTINCT arm/hand pose (plus props) so states read
+  // apart at a glance. Order of drawing: props behind → body → head → laptop →
+  // arms (so hands sit on top of the laptop) → overlays/badges.
   if (state === 'coding' || state === 'running') {
-    // Both hands on the laptop with a subtle typing bob; bright scrolling code.
+    // Both forearms angled IN to the keyboard, hands on the deck, typing bob.
+    drawNotebook(ctx);
     drawCoffee(ctx, accent, false, t);
     drawBody(ctx, shirt, 0);
     drawHead(ctx, hair, 0, 0);
-    const bob = Math.floor(t / 5) % 2; // 0/1 px alternating per hand
     const scr = drawLaptop(ctx, accent, '#0B1220');
     drawScreenCode(ctx, scr, t);
-    drawArm(ctx, shirt, lShoulder.x, lShoulder.y, CX - 12, 64 + bob);
-    drawArm(ctx, shirt, rShoulder.x, rShoulder.y, CX + 12, 64 + (1 - bob));
+    const bob = Math.floor(t / 5) % 2; // 0/1 px alternating per hand
+    drawArm(ctx, shirt, lShoulder.x, lShoulder.y, CX - 11, 64 + bob);
+    drawArm(ctx, shirt, rShoulder.x, rShoulder.y, CX + 11, 64 + (1 - bob));
 
-  } else if (state === 'reading' || state === 'searching') {
-    // One hand holds a sheet of paper out to the side; head turned slightly.
+  } else if (state === 'reading') {
+    // BOTH hands hold a sheet raised in front; head tilted down; laptop pushed
+    // back (drawn small/dim behind the paper).
     drawCoffee(ctx, accent, false, t);
     drawBody(ctx, shirt, 0);
-    drawHead(ctx, hair, 5, 0); // glance toward the held paper
-    const scr = drawLaptop(ctx, accent, '#0F172A');
-    drawScreenCode(ctx, scr, Math.floor(t / 2)); // faint idle content
-    // Left hand rests near laptop; right hand holds a paper to the right.
-    drawArm(ctx, shirt, lShoulder.x, lShoulder.y, CX - 12, 64);
-    const px2 = CX + 36, py2 = 50;
-    drawArm(ctx, shirt, rShoulder.x, rShoulder.y, px2, py2);
-    // The held sheet (with scanning lines for searching).
-    ctx.save(); ctx.translate(px2 + 8, py2); ctx.rotate(-0.12);
-    ctx.fillStyle = '#F9FAFB'; rr(ctx, -2, -14, 22, 28, 2); ctx.fill();
+    drawHead(ctx, hair, 0, -2); // head dipped toward the page
+    const scr = drawLaptop(ctx, accent, '#0B1018');
+    ctx.fillStyle = rgba('#000000', 0.35); rr(ctx, scr.sx, scr.sy, scr.sw, scr.sh, 2); ctx.fill(); // dim, pushed-back
+    // Both hands come together at the paper, held in front of the chest.
+    const pX = CX, pY = 44;
+    drawArm(ctx, shirt, lShoulder.x, lShoulder.y, pX - 11, pY + 2);
+    drawArm(ctx, shirt, rShoulder.x, rShoulder.y, pX + 11, pY + 2);
+    // The raised sheet, faintly bobbing as if held/read.
+    ctx.save(); ctx.translate(pX, pY + Math.sin(t * 0.05));
+    ctx.fillStyle = '#F9FAFB'; rr(ctx, -16, -12, 32, 28, 2); ctx.fill();
     ctx.fillStyle = '#9CA3AF';
-    for (let r = 0; r < 6; r++) { rr(ctx, 1, -10 + r * 4, 16 - (r % 2) * 4, 1.5, 1); ctx.fill(); }
-    if (state === 'searching') { // moving highlight bar
-      const hp = Math.floor(t / 12) % 6;
-      ctx.fillStyle = rgba(accent, 0.5); rr(ctx, 0, -11 + hp * 4, 18, 3, 1); ctx.fill();
-    }
+    for (let r = 0; r < 6; r++) { rr(ctx, -12, -8 + r * 4, 24 - (r % 3) * 5, 1.6, 1); ctx.fill(); }
     ctx.restore();
 
+  } else if (state === 'searching') {
+    // One hand forward on a MOUSE, the other flat on the desk; a couple of
+    // loose papers; head scanning left↔right.
+    drawCoffee(ctx, accent, false, t);
+    // Loose papers fanned beside the keyboard.
+    [[34, 40, -0.22], [30, 52, 0.16]].forEach(([px2, py2, rot]) => {
+      ctx.save(); ctx.translate(px2, py2); ctx.rotate(rot);
+      ctx.fillStyle = '#F3F4F6'; rr(ctx, -9, -11, 18, 22, 2); ctx.fill();
+      ctx.fillStyle = '#CBD5E1';
+      for (let r = 0; r < 4; r++) { rr(ctx, -6, -7 + r * 4, 12, 1.4, 1); ctx.fill(); }
+      ctx.restore();
+    });
+    const scanT = Math.sin(t * 0.06) * 4; // scanning glance
+    drawBody(ctx, shirt, 0);
+    drawHead(ctx, hair, scanT, 0);
+    const scr = drawLaptop(ctx, accent, '#0F172A');
+    drawScreenCode(ctx, scr, Math.floor(t / 4)); // slow idle content
+    // moving highlight bar on screen = "scanning"
+    const hp = Math.floor(t / 10) % 5;
+    ctx.fillStyle = rgba(accent, 0.45); rr(ctx, scr.sx + 2, scr.sy + 2 + hp * 4, scr.sw - 4, 3, 1); ctx.fill();
+    // Left hand flat on the desk; right hand forward on a mouse (slides a touch).
+    drawArm(ctx, shirt, lShoulder.x, lShoulder.y, CX - 26, 56);
+    const mX = CX + 30 + Math.sin(t * 0.08) * 2, mY = 62;
+    drawArm(ctx, shirt, rShoulder.x, rShoulder.y, mX, mY);
+    ctx.fillStyle = '#D1D5DB'; ctx.beginPath(); ctx.ellipse(mX, mY, 5, 7, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#9CA3AF'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(mX, mY - 7); ctx.lineTo(mX, mY); ctx.stroke();
+
   } else if (state === 'spawning') {
-    // One arm raised holding a phone up; small chat bubbles near it.
+    // One arm raised holding a PHONE up by the head; other hand GESTURES out;
+    // small chat bubbles rising near the phone.
+    drawNotebook(ctx);
     drawCoffee(ctx, accent, false, t);
     drawBody(ctx, shirt, 0);
-    drawHead(ctx, hair, 0, 0);
+    drawHead(ctx, hair, 4, 0); // leaning toward the phone
     const scr = drawLaptop(ctx, accent, '#0F172A');
-    drawScreenCode(ctx, scr, Math.floor(t / 2));
-    drawArm(ctx, shirt, lShoulder.x, lShoulder.y, CX - 12, 64);
-    // Right arm raised up/right holding the phone.
-    const phX = CX + 34, phY = 26;
+    drawScreenCode(ctx, scr, Math.floor(t / 3));
+    // Left hand gesturing out to the side (open, away from desk).
+    drawArm(ctx, shirt, lShoulder.x, lShoulder.y, CX - 34, 36);
+    // Right arm raised, phone held up beside the head.
+    const phX = CX + 22, phY = 24;
     drawArm(ctx, shirt, rShoulder.x, rShoulder.y, phX, phY);
-    ctx.fillStyle = '#1F2937'; rr(ctx, phX - 5, phY - 9, 10, 18, 2); ctx.fill();
-    ctx.fillStyle = rgba(accent, 0.9); rr(ctx, phX - 3.5, phY - 7, 7, 14, 1); ctx.fill();
+    ctx.save(); ctx.translate(phX, phY); ctx.rotate(0.12);
+    ctx.fillStyle = '#1F2937'; rr(ctx, -5, -10, 10, 20, 2); ctx.fill();
+    ctx.fillStyle = rgba(accent, 0.9); rr(ctx, -3.5, -8, 7, 16, 1); ctx.fill();
+    ctx.restore();
     // Chat bubbles popping in/out over time.
-    const nb = Math.floor(t / 12) % 3 + 1;
+    const nb = Math.floor(t / 10) % 3 + 1;
     for (let i = 0; i < nb; i++) {
       ctx.fillStyle = rgba('#FFFFFF', 0.85);
-      ctx.beginPath(); ctx.arc(phX + 8 + i * 7, phY - 14 - i * 5, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(phX + 8 + i * 7, phY - 12 - i * 5, 3, 0, Math.PI * 2); ctx.fill();
     }
 
   } else if (state === 'thinking') {
-    // A hand up near the head; a "?" bubble floats above.
+    // ONE hand raised to the temple/chin; the other resting on the desk; a "?"
+    // bubble floats and bobs above.
+    drawNotebook(ctx);
     drawCoffee(ctx, accent, false, t);
     drawBody(ctx, shirt, 0);
     drawHead(ctx, hair, -3, 0);
     const scr = drawLaptop(ctx, accent, '#0F172A');
-    drawScreenCode(ctx, scr, Math.floor(t / 3));
-    drawArm(ctx, shirt, lShoulder.x, lShoulder.y, CX - 12, 64);
-    drawArm(ctx, shirt, rShoulder.x, rShoulder.y, CX + 10, 30); // hand near head
+    drawScreenCode(ctx, scr, Math.floor(t / 6)); // slow, contemplative
+    // Left hand rests low on the desk; right hand up at the temple.
+    drawArm(ctx, shirt, lShoulder.x, lShoulder.y, CX - 22, 58);
+    drawArm(ctx, shirt, rShoulder.x, rShoulder.y, CX + 12, 26); // hand at temple
     // "?" bubble, gently bobbing.
-    const qy = 14 + Math.sin(t * 0.08) * 2, qx = CX + 24;
+    const qy = 14 + Math.sin(t * 0.08) * 2, qx = CX + 26;
     ctx.fillStyle = '#F5F3FF';
     rr(ctx, qx - 9, qy - 9, 18, 18, 6); ctx.fill();
     ctx.beginPath(); ctx.moveTo(qx - 8, qy + 7); ctx.lineTo(qx - 12, qy + 12); ctx.lineTo(qx - 4, qy + 8); ctx.closePath(); ctx.fill();
@@ -265,63 +298,74 @@ export function draw(ctx, agent, t) {
     ctx.fillText('?', qx, qy + 1);
 
   } else if (state === 'testing') {
-    // Laptop screen shows an alternating ✓ / ✗; both hands resting on deck.
+    // Both hands on the laptop; screen alternates ✓ / ✗.
+    drawNotebook(ctx);
     drawCoffee(ctx, accent, false, t);
     drawBody(ctx, shirt, 0);
     drawHead(ctx, hair, 0, 0);
     const scr = drawLaptop(ctx, accent, '#0B1220');
     drawScreenTest(ctx, scr, t);
-    drawArm(ctx, shirt, lShoulder.x, lShoulder.y, CX - 12, 65);
-    drawArm(ctx, shirt, rShoulder.x, rShoulder.y, CX + 12, 65);
+    drawArm(ctx, shirt, lShoulder.x, lShoulder.y, CX - 11, 65);
+    drawArm(ctx, shirt, rShoulder.x, rShoulder.y, CX + 11, 65);
 
   } else if (state === 'error') {
-    // Arms thrown up, papers scattered, red "!" — reddish tint applied in desk.
+    // BOTH arms thrown up/out (startled); papers scattered; red "!".
     const shake = Math.floor(t / 3) % 2 === 0 ? -1.5 : 1.5;
-    // Scattered papers behind the figure.
-    [[24, 70, -0.3], [40, 78, 0.2], [80, 72, 0.35]].forEach(([px2, py2, rot], i) => {
+    // Scattered papers strewn around the desk.
+    [[22, 66, -0.35], [38, 80, 0.25], [82, 72, 0.4], [70, 40, -0.2]].forEach(([px2, py2, rot], i) => {
       ctx.save(); ctx.translate(px2 + shake * (i % 2), py2); ctx.rotate(rot);
       ctx.fillStyle = '#E5E7EB'; rr(ctx, -8, -10, 16, 20, 2); ctx.fill(); ctx.restore();
     });
     drawBody(ctx, shirt, 0);
     drawHead(ctx, hair, shake * 0.6, 0);
     drawLaptop(ctx, '#EF4444', '#1A0B0B');
-    // Both arms flung up and outward.
-    drawArm(ctx, shirt, lShoulder.x, lShoulder.y, CX - 34 + shake, 22);
-    drawArm(ctx, shirt, rShoulder.x, rShoulder.y, CX + 34 - shake, 22);
+    // Both arms flung up and outward (startled).
+    drawArm(ctx, shirt, lShoulder.x, lShoulder.y, CX - 36 + shake, 20);
+    drawArm(ctx, shirt, rShoulder.x, rShoulder.y, CX + 36 - shake, 20);
     // Red "!" above.
     ctx.fillStyle = '#EF4444'; ctx.font = 'bold 18px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('!', CX + shake, 16);
+    ctx.fillText('!', CX + shake, 14);
 
   } else if (state === 'done') {
-    // Relaxed: hands off the keyboard, a small ✓ above.
+    // Relaxed — a clear THUMBS-UP raised; the other hand back; green ✓ above.
     drawCoffee(ctx, accent, true, t);
     drawBody(ctx, shirt, 0);
     drawHead(ctx, hair, 0, 0);
     const scr = drawLaptop(ctx, accent, '#0F172A');
-    drawScreenTest(ctx, { ...scr }, 0); // static ✓
-    // Hands relaxed at the sides, off the deck.
-    drawArm(ctx, shirt, lShoulder.x, lShoulder.y, CX - 30, 52);
-    drawArm(ctx, shirt, rShoulder.x, rShoulder.y, CX + 30, 52);
-    // Floating ✓ badge.
+    drawScreenTest(ctx, { ...scr }, 0); // static ✓ on screen
+    // Left arm relaxed back; right arm gives a thumbs-up out to the side.
+    drawArm(ctx, shirt, lShoulder.x, lShoulder.y, CX - 30, 50);
+    const tuX = CX + 30, tuY = 38;
+    drawArm(ctx, shirt, rShoulder.x, rShoulder.y, tuX, tuY);
+    // Thumbs-up: fist + thumb sticking up.
+    ctx.fillStyle = SKIN;
+    ctx.beginPath(); ctx.arc(tuX, tuY, 4.5, 0, Math.PI * 2); ctx.fill();
+    rr(ctx, tuX - 1.6, tuY - 11, 3.2, 8, 1.5); ctx.fill(); // thumb up
+    // Floating ✓ badge, gently bobbing.
     const by = 16 + Math.sin(t * 0.1) * 1.5;
     ctx.strokeStyle = '#10B981'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     ctx.beginPath(); ctx.moveTo(CX - 7, by); ctx.lineTo(CX - 2, by + 5); ctx.lineTo(CX + 8, by - 7); ctx.stroke();
 
   } else {
-    // idle (default): leaned back (figure shifted down), hands off the keyboard,
-    // coffee cup with rising steam.
+    // idle (default): leaned back, BOTH hands behind the head (elbows out),
+    // coffee with rising steam; no typing.
     drawCoffee(ctx, accent, true, t);
     drawBody(ctx, shirt, dyIdle);
     drawHead(ctx, hair, 0, dyIdle);
     drawLaptop(ctx, accent, '#0F172A');
-    // Relaxed hands resting wide, away from the laptop.
-    drawArm(ctx, shirt, lShoulder.x, lShoulder.y, CX - 32, 58);
-    drawArm(ctx, shirt, rShoulder.x, rShoulder.y, CX + 32, 58);
+    const hy = 22 + dyIdle; // head centre (matches drawHead)
+    // Both arms sweep UP and OUT to the sides, hands meeting behind the head.
+    drawArm(ctx, shirt, lShoulder.x, lShoulder.y, CX - 22, hy - 2);
+    drawArm(ctx, shirt, rShoulder.x, rShoulder.y, CX + 22, hy - 2);
+    // Hands tucked behind the head (drawn over the hair, near the top corners).
+    ctx.fillStyle = SKIN;
+    ctx.beginPath(); ctx.arc(CX - 13, hy - 6, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(CX + 13, hy - 6, 4, 0, Math.PI * 2); ctx.fill();
     // Z's drifting up (idle cue), looping via t.
     const zp = t % 90, za = zp < 45 ? zp / 45 : (90 - zp) / 45;
     ctx.globalAlpha = Math.max(0, za);
     ctx.fillStyle = '#9CA3AF'; ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('z', CX + 18 + zp * 0.1, 24 - zp * 0.18);
+    ctx.fillText('z', CX + 20 + zp * 0.1, 20 - zp * 0.18);
     ctx.globalAlpha = 1;
   }
 

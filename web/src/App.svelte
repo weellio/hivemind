@@ -8,6 +8,7 @@
   import Hierarchy from './lib/Hierarchy.svelte';
   import ThemeMenu from './lib/ThemeMenu.svelte';
   import Office from './lib/Office.svelte';
+  import TreeView from './lib/TreeView.svelte';
   import { theme, applyTheme } from './lib/theme.js';
 
   $effect(() => applyTheme($theme));
@@ -101,6 +102,7 @@
       </select>
 
       <select class="select" bind:value={$layout}>
+        <option value="tree">Tree (org chart)</option>
         <option value="mosaic">Mosaic</option>
         <option value="solo">Solo</option>
         <option value="squad">Squad</option>
@@ -136,6 +138,8 @@
 
   {#if shown.length === 0}
     <div class="empty">No agents reporting yet. Run <code>/hooks</code> in a Claude Code session (or start a new one) to begin.</div>
+  {:else if $layout === 'tree'}
+    <div class="tree-wrap"><TreeView agents={shown} /></div>
   {:else if $layout === 'office'}
     <div class="office-wrap"><Office agents={shown} /></div>
   {:else}
@@ -146,7 +150,7 @@
     </div>
   {/if}
 
-  {#if $layout !== 'office'}<Hierarchy agents={shown} />{/if}
+  {#if $layout !== 'office' && $layout !== 'tree'}<Hierarchy agents={shown} />{/if}
 </div>
 
 <style>
@@ -175,8 +179,8 @@
   .cnt { display: inline-flex; align-items: center; gap: 4px; }
   .cnt i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
   .empty { padding: 40px; text-align: center; color: var(--color-text-tertiary); font-size: 13px; }
-  .office-wrap { height: calc(100vh - 175px); min-height: 440px; border: 0.5px solid var(--color-border-tertiary);
-    border-radius: var(--border-radius-lg); overflow: hidden; background: var(--color-background-primary); }
+  .office-wrap, .tree-wrap { height: calc(100vh - 175px); min-height: 440px; border: 0.5px solid var(--color-border-tertiary);
+    border-radius: var(--border-radius-lg); overflow: auto; background: var(--color-background-primary); }
   code { font-family: var(--font-mono); background: var(--color-background-primary); padding: 1px 5px; border-radius: 4px; }
 
   /* ── layout presets ── */
