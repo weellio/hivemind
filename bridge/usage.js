@@ -279,12 +279,17 @@ async function build() {
     .sort((a, b) => b.costUSD - a.costUSD)
     .slice(0, 10);
 
+  // bySession — cost/tokens keyed by sessionId, for live per-agent lookup
+  const bySession = {};
+  for (const s of sessions.values()) bySession[s.sessionId] = { costUSD: s.costUSD, tokens: s.tokens };
+
   return {
     totals,
     byProject,
     byModel,
     byDay,
     topSessions,
+    bySession,
     generatedAt: new Date().toISOString(),
     fileCount: entries.length,
   };
@@ -314,6 +319,7 @@ function emptyShape() {
     byModel: [],
     byDay,
     topSessions: [],
+    bySession: {},
     generatedAt: new Date().toISOString(),
     fileCount: 0,
   };

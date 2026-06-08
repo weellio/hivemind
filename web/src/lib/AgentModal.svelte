@@ -1,11 +1,15 @@
 <script>
   import { onMount } from 'svelte';
   import { STATE_COLORS, STATE_LABEL } from './states.js';
+  import TranscriptPanel from './TranscriptPanel.svelte';
 
   let { id, onClose } = $props();
   let agent = $state(null);
   let info = $state(null);
   let msg = $state('');
+  let cost = $state(null);
+  let txId = $state(null);
+  let sid = $derived(agent ? (agent.sessionId || String(agent.id).replace(/^sess:/, '')) : '');
 
   async function refresh() {
     try {
@@ -23,8 +27,12 @@
       info = await r.json();
     } catch (_) {}
   }
+  async function loadCost() {
+    if (!sid) return;
+    try { const r = await fetch('/api/usage'); const j = await r.json(); cost = (j.bySession && j.bySession[sid]) || null; } catch (_) {}
+  }
   onMount(() => {
-    refresh().then(loadInfo);
+    refresh().then(() => { loadInfo(); loadCost(); });
     const t = setInterval(refresh, 1200);
     return () => clearInterval(t);
   });
@@ -62,6 +70,7 @@
         {#if agent.project}<span>{agent.project}</span>{/if}
         {#if agent.sessionId}<span class="mono">· {String(agent.sessionId).slice(0, 8)}</span>{/if}
         {#if agent.parentId}<span>· sub-agent</span>{/if}
+        {#if cost}<span class="mono" title="This session's estimated spend">· 💰 ${cost.costUSD.toFixed(2)}</span>{/if}
       </div>
       {#if agent.cwd}<div class="path mono">{agent.cwd}</div>{/if}
 
@@ -84,10 +93,11 @@
         </div>
       {/if}
 
-      {#if agent.cwd}
+      {#if agent.cwd || sid}
         <div class="actions">
-          <button class="select" onclick={() => openIn('folder')}>📂 Open folder</button>
-          <button class="select" onclick={() => openIn('editor')}>Open in VS Code</button>
+          {#if sid}<button class="select" onclick={() => (txId = sid)}>📄 Transcript</button>{/if}
+          {#if agent.cwd}<button class="select" onclick={() => openIn('folder')}>📂 Open folder</button>{/if}
+          {#if agent.cwd}<button class="select" onclick={() => openIn('editor')}>Open in VS Code</button>{/if}
         </div>
       {/if}
 
@@ -103,6 +113,8 @@
     {/if}
   </div>
 </div>
+
+<TranscriptPanel bind:sessionId={txId} />
 
 <style>
   .backdrop {
