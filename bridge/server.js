@@ -548,6 +548,27 @@ const server = http.createServer(async (req, res) => {
     return sendJson(res, 200, { ok: true, roots: c.roots });
   }
 
+  if (url === '/api/pick-folder' && req.method === 'POST') {
+    if (process.platform !== 'win32') return sendJson(res, 200, { cancelled: true, error: 'native picker is Windows-only — type a path instead' });
+    const ps = "Add-Type -AssemblyName System.Windows.Forms; $d=New-Object System.Windows.Forms.FolderBrowserDialog; $d.Description='Select a folder that holds Claude projects'; $d.ShowNewFolderButton=$false; if($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK){ [Console]::Out.Write($d.SelectedPath) }";
+    let out = '';
+    let done = false;
+    const finish = (obj) => { if (done) return; done = true; sendJson(res, 200, obj); };
+    try {
+      const child = spawn('powershell', ['-NoProfile', '-STA', '-Command', ps], { windowsHide: false });
+      child.stdout.on('data', (c) => (out += c));
+      child.on('error', () => finish({ cancelled: true, error: 'picker failed' }));
+      child.on('close', () => {
+        const p = out.trim();
+        if (!p) return finish({ cancelled: true });
+        projects.addRoot(p);
+        console.log(`[projects] added root via picker: ${p}`);
+        finish({ ok: true, path: p, roots: projects.getConfig().roots });
+      });
+    } catch (_) { finish({ cancelled: true, error: 'picker failed' }); }
+    return;
+  }
+
   if (url === '/api/copy-component' && req.method === 'POST') {
     const body = await readBody(req);
     if (!body) return sendJson(res, 400, { error: 'invalid JSON' });

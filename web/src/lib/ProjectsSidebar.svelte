@@ -14,6 +14,7 @@
   async function post(path, body) { try { return await (await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json(); } catch (_) { return null; } }
   async function addRoot() { const p = newRoot.trim(); if (!p) return; await post('/api/projects/roots', { path: p }); newRoot = ''; load(); }
   async function removeRoot(p) { await post('/api/projects/roots', { action: 'remove', path: p }); load(); }
+  async function browse() { result = 'Opening folder picker…'; const j = await post('/api/pick-folder', {}); result = j && j.ok ? `Added ${j.path}` : (j && j.error ? j.error : ''); load(); }
   function pick(proj, type, name) { selected = { fromPath: proj.path, fromName: proj.name, type, name }; target = ''; result = ''; }
   async function doCopy() {
     if (!selected || !target) return;
@@ -45,6 +46,7 @@
       <div class="addrow">
         <input bind:value={newRoot} placeholder="add a folder path…" onkeydown={(e) => e.key === 'Enter' && addRoot()} />
         <button class="select" onclick={addRoot}>Add</button>
+        <button class="select" onclick={browse} title="Pick a folder with the OS dialog">Browse…</button>
       </div>
     </div>
 
