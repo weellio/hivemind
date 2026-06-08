@@ -278,7 +278,7 @@
           ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
           // animated dashed centre line, tinted by the sub's state, flowing parent→child
           ctx.globalAlpha = 0.5;
-          ctx.strokeStyle = STATE_COLORS[sub.agent.state] || '#8891a0';
+          ctx.strokeStyle = STATE_COLORS[sub.state] || '#8891a0';
           ctx.lineWidth = 1.5; ctx.setLineDash([4, 5]); ctx.lineDashOffset = -(frameN * 0.5) % 9;
           ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
           ctx.globalAlpha = 1; ctx.setLineDash([]);
