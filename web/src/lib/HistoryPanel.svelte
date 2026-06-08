@@ -1,5 +1,5 @@
 <script>
-  let { open = $bindable(false) } = $props();
+  let { open = $bindable(false), onView } = $props();
   let _wasOpen = false;
   $effect(() => { if (open && !_wasOpen) openPanel(); _wasOpen = open; });
   let sessions = $state([]);
@@ -109,6 +109,7 @@
             <div class="row-bottom">
               <span class="sid mono">{s.sessionId.slice(0, 8)}</span>
               <span class="rb-actions">
+                {#if onView}<button class="copy-btn" onclick={() => onView(s.sessionId)} title="Read this session's transcript">View</button>{/if}
                 <button class="copy-btn" onclick={() => resume(s)} title="Open a terminal and resume this session">
                   {launched === s.sessionId ? 'launching…' : '▶ Resume'}
                 </button>

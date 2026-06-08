@@ -9,6 +9,8 @@
   import GithubPanel from './lib/GithubPanel.svelte';
   import SettingsPanel from './lib/SettingsPanel.svelte';
   import HistoryPanel from './lib/HistoryPanel.svelte';
+  import HealthPanel from './lib/HealthPanel.svelte';
+  import TranscriptPanel from './lib/TranscriptPanel.svelte';
   import Hierarchy from './lib/Hierarchy.svelte';
   import ThemeMenu from './lib/ThemeMenu.svelte';
   import Office from './lib/Office.svelte';
@@ -95,8 +97,9 @@
   // Manage / Options menus + the panels they control
   let menuOpen = $state(false);
   let optsOpen = $state(false);
-  let panels = $state({ projects: false, usage: false, github: false, config: false, history: false });
+  let panels = $state({ projects: false, usage: false, github: false, config: false, history: false, health: false });
   function openP(k) { panels[k] = true; menuOpen = false; }
+  let transcriptId = $state(null);
 
   onMount(() => {
     poll();
@@ -207,6 +210,7 @@
             <button class="select" onclick={() => openP('github')}>GitHub</button>
             <button class="select" onclick={() => openP('config')}>Config (hooks · MCP)</button>
             <button class="select" onclick={() => openP('history')}>Session history</button>
+            <button class="select" onclick={() => openP('health')}>Health / status</button>
           </div>
         {/if}
       </div>
@@ -239,7 +243,9 @@
   <CostPanel bind:open={panels.usage} />
   <GithubPanel bind:open={panels.github} />
   <SettingsPanel bind:open={panels.config} />
-  <HistoryPanel bind:open={panels.history} />
+  <HistoryPanel bind:open={panels.history} onView={(sid) => (transcriptId = sid)} />
+  <HealthPanel bind:open={panels.health} />
+  <TranscriptPanel bind:sessionId={transcriptId} />
 
   <div class="statusbar">
     <strong>{selectedProject || 'All projects'}</strong>

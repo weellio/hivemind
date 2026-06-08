@@ -30,6 +30,10 @@ const usage = require('./usage.js');
 const github = require('./github.js');
 const configmgr = require('./configmgr.js');
 const history = require('./history.js');
+const health = require('./health.js');
+const transcript = require('./transcript.js');
+const STARTED = Date.now();
+let eventsReceived = 0;
 
 const argPort = (() => {
   const i = process.argv.indexOf('--port');
@@ -506,6 +510,7 @@ const server = http.createServer(async (req, res) => {
   if (url === '/api/hook' && req.method === 'POST') {
     const body = await readBody(req);
     if (!body) return sendJson(res, 400, { error: 'invalid JSON' });
+    eventsReceived++;
     const project = projectFromCwd(body.cwd);
     if (body.session_id) lastActiveSession = body.session_id;
     if (body.cwd) projects.noteKnown(body.cwd);   // auto-import the project
@@ -657,6 +662,26 @@ const server = http.createServer(async (req, res) => {
 
   if (url === '/api/history' && req.method === 'GET') {
     return sendJson(res, 200, await history.list({}));
+  }
+
+  if (url === '/api/transcript' && req.method === 'POST') {
+    const body = await readBody(req);
+    return sendJson(res, 200, await transcript.read(body && body.sessionId));
+  }
+
+  if (url === '/api/health' && req.method === 'GET') {
+    let version = 'dev';
+    try { version = require('../package.json').version || 'dev'; } catch (_) {}
+    const sessions = new Set(Array.from(agents.values()).map((a) => a.sessionId).filter(Boolean)).size;
+    const bridge = {
+      uptimeMs: Date.now() - STARTED,
+      port: argPort,
+      eventsReceived,
+      sessions,
+      projectsKnown: projects.discover().length,
+      version,
+    };
+    return sendJson(res, 200, { bridge, ...health.report() });
   }
 
   if (url === '/api/github' && req.method === 'POST') {
