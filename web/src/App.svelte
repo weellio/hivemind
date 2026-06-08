@@ -8,10 +8,11 @@
   import Hierarchy from './lib/Hierarchy.svelte';
   import ThemeMenu from './lib/ThemeMenu.svelte';
   import Office from './lib/Office.svelte';
-  import TreeView from './lib/TreeView.svelte';
   import { theme, applyTheme } from './lib/theme.js';
 
   $effect(() => applyTheme($theme));
+  // only Office + Mosaic remain; coerce any stale saved layout
+  $effect(() => { if ($layout !== 'office' && $layout !== 'mosaic') $layout = 'office'; });
 
   let agents = $state([]);
   let projects = $state([]);
@@ -102,13 +103,8 @@
       </select>
 
       <select class="select" bind:value={$layout}>
-        <option value="tree">Tree (org chart)</option>
-        <option value="mosaic">Mosaic</option>
-        <option value="solo">Solo</option>
-        <option value="squad">Squad</option>
-        <option value="warroom">War Room</option>
-        <option value="broadcast">Broadcast</option>
         <option value="office">Office (floor)</option>
+        <option value="mosaic">Mosaic</option>
       </select>
 
       <select class="select" bind:value={$avatarMode}>
@@ -138,19 +134,17 @@
 
   {#if shown.length === 0}
     <div class="empty">No agents reporting yet. Run <code>/hooks</code> in a Claude Code session (or start a new one) to begin.</div>
-  {:else if $layout === 'tree'}
-    <div class="tree-wrap"><TreeView agents={shown} /></div>
   {:else if $layout === 'office'}
     <div class="office-wrap"><Office agents={shown} /></div>
   {:else}
-    <div class="grid" data-layout={$layout}>
+    <div class="grid">
       {#each shown as agent (agent.id)}
         <AgentTile {agent} />
       {/each}
     </div>
   {/if}
 
-  {#if $layout !== 'office' && $layout !== 'tree'}<Hierarchy agents={shown} />{/if}
+  {#if $layout !== 'office'}<Hierarchy agents={shown} />{/if}
 </div>
 
 <style>
@@ -179,16 +173,10 @@
   .cnt { display: inline-flex; align-items: center; gap: 4px; }
   .cnt i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
   .empty { padding: 40px; text-align: center; color: var(--color-text-tertiary); font-size: 13px; }
-  .office-wrap, .tree-wrap { position: relative; height: calc(100vh - 175px); min-height: 440px; border: 0.5px solid var(--color-border-tertiary);
+  .office-wrap { position: relative; height: calc(100vh - 175px); min-height: 440px; border: 0.5px solid var(--color-border-tertiary);
     border-radius: var(--border-radius-lg); overflow: auto; background: var(--color-background-primary); }
   code { font-family: var(--font-mono); background: var(--color-background-primary); padding: 1px 5px; border-radius: 4px; }
 
-  /* ── layout presets ── */
-  .grid { display: grid; gap: 12px; }
-  .grid[data-layout="mosaic"] { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
-  .grid[data-layout="solo"] { grid-template-columns: 1fr; }
-  .grid[data-layout="squad"] { grid-template-columns: repeat(2, 1fr); }
-  .grid[data-layout="warroom"] { grid-template-columns: repeat(3, 1fr); }
-  .grid[data-layout="broadcast"] { grid-template-columns: 2fr 1fr; grid-auto-rows: min-content; }
-  .grid[data-layout="broadcast"] :global(.tile:first-child) { grid-row: span 3; }
+  /* mosaic grid */
+  .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
 </style>
