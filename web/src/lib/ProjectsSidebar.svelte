@@ -25,7 +25,7 @@
   async function addRoot() { const p = newRoot.trim(); if (!p) return; await post('/api/projects/roots', { path: p }); newRoot = ''; load(); }
   async function removeRoot(p) { await post('/api/projects/roots', { action: 'remove', path: p }); load(); }
   async function browse() { result = 'Opening folder picker…'; const j = await post('/api/pick-folder', {}); result = j && j.ok ? `Added ${j.path}` : (j && j.error ? j.error : ''); load(); }
-  function pick(proj, type, name) { selected = { fromPath: proj.path, fromName: proj.name, type, name }; target = ''; result = ''; }
+  function pick(proj, type, name) { selected = { fromPath: proj.path, fromName: proj.name, type, name }; target = ''; result = ''; pendingDiff = null; }
 
   let busy = $state('');
   let commitMsg = $state({});
@@ -78,14 +78,17 @@
     result = j && j.ok ? `Created & switched to ${br}` : `branch ✗ ${(j && j.output) || (j && j.error) || ''}`;
     busy = ''; newBranch = { ...newBranch, [p.path]: '' }; loadGit(); await refreshBranches(p);
   }
-  async function doCopy() {
+  let pendingDiff = $state(null);
+  async function doCopy(force = false) {
     if (!selected || !target) return;
-    const body = { type: selected.type, name: selected.name, fromCwd: selected.fromPath, toCwd: target };
+    const body = { type: selected.type, name: selected.name, fromCwd: selected.fromPath, toCwd: target, overwrite: force };
     let j = await post('/api/copy-component', body);
-    if (j && j.exists) {
-      if (!confirm(`“${selected.name}” already exists in the target project. Overwrite it?`)) { result = 'Cancelled — already exists.'; return; }
-      j = await post('/api/copy-component', { ...body, overwrite: true });
+    if (j && j.exists && !force) {
+      const d = await post('/api/component-diff', { type: selected.type, name: selected.name, fromCwd: selected.fromPath, toCwd: target });
+      pendingDiff = d && !d.error ? d : { note: 'Already exists in the target.' };
+      return;
     }
+    pendingDiff = null;
     result = j && j.ok ? `Copied ${selected.type} “${selected.name}” → ${String(target).split(/[\\/]/).pop()}` : 'Error: ' + ((j && j.error) || 'failed');
     load();
   }
@@ -171,12 +174,25 @@
       <div class="copybar">
         <div class="sl">Copy <b>{selected.type}</b> “{selected.name}” from <b>{selected.fromName}</b></div>
         <div class="row">
-          <select bind:value={target} class="select">
+          <select bind:value={target} class="select" onchange={() => (pendingDiff = null)}>
             <option value="">to project…</option>
             {#each data.projects.filter((p) => p.path !== selected.fromPath) as p (p.path)}<option value={p.path}>{p.name}</option>{/each}
           </select>
-          <button class="select" onclick={doCopy} disabled={!target}>Copy</button>
+          <button class="select" onclick={() => doCopy()} disabled={!target}>Copy</button>
         </div>
+        {#if pendingDiff}
+          <div class="diffbox">
+            <div class="diffhd">⚠ Exists in target — review before overwriting:</div>
+            {#if pendingDiff.lines}
+              <div class="cdiff">{#each pendingDiff.lines as ln, i (i)}<div class="dl {ln.t === '+' ? 'add' : ln.t === '-' ? 'del' : 'ctx'}">{ln.t}{ln.text}</div>{/each}</div>
+            {/if}
+            {#if pendingDiff.note}<div class="diffnote">{pendingDiff.note}</div>{/if}
+            <div class="row">
+              <button class="select" onclick={() => doCopy(true)}>Overwrite</button>
+              <button class="select" onclick={() => (pendingDiff = null)}>Cancel</button>
+            </div>
+          </div>
+        {/if}
         {#if result}<div class="res">{result}</div>{/if}
       </div>
     {/if}
@@ -230,4 +246,13 @@
   .copybar .row { display: flex; gap: 6px; }
   .copybar select { flex: 1 1 auto; }
   .res { font-size: 11px; color: var(--color-text-secondary); }
+  .diffbox { display: flex; flex-direction: column; gap: 6px; }
+  .diffhd { font-size: 10px; color: #F59E0B; }
+  .cdiff { max-height: 200px; overflow: auto; font-family: var(--font-mono); font-size: 10px; line-height: 1.35;
+    background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); padding: 6px 8px; }
+  .dl { white-space: pre-wrap; word-break: break-all; }
+  .dl.add { color: #10B981; background: rgba(16, 185, 129, 0.08); }
+  .dl.del { color: #EF4444; background: rgba(239, 68, 68, 0.08); }
+  .dl.ctx { color: var(--color-text-tertiary); }
+  .diffnote { font-size: 10px; color: var(--color-text-tertiary); }
 </style>
