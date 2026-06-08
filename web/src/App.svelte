@@ -59,11 +59,23 @@
       online = true;
     } catch (_) { online = false; }
   }
+  let usage = $state(null);
+  async function pollUsage() { try { const r = await fetch('/api/usage'); usage = await r.json(); } catch (_) {} }
+  let todayCost = $derived.by(() => {
+    if (!usage?.byDay?.length) return null;
+    const t = new Date();
+    const k = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+    const d = usage.byDay.find((x) => x.date === k);
+    return d ? d.costUSD : 0;
+  });
+
   onMount(() => {
     poll();
+    pollUsage();
     fetch('/api/license').then((r) => r.json()).then((s) => (license = s)).catch(() => {});
     const id = setInterval(poll, 500);
-    return () => clearInterval(id);
+    const uid = setInterval(pollUsage, 60000);
+    return () => { clearInterval(id); clearInterval(uid); };
   });
 
   let shown = $derived(
@@ -160,6 +172,7 @@
   <div class="statusbar">
     <strong>{selectedProject || 'All projects'}</strong>
     <span>· {sessionCount} session{sessionCount === 1 ? '' : 's'} · {shown.length} agent{shown.length === 1 ? '' : 's'}</span>
+    {#if usage?.totals}<span class="cost" title="Estimated from ~/.claude transcripts">💰 today ${todayCost?.toFixed(2) ?? '0.00'} · total ${usage.totals.costUSD.toFixed(0)}</span>{/if}
     {#each Object.entries(counts) as [state, n] (state)}
       <span class="cnt"><i style="background:{STATE_COLORS[state] || '#888'}"></i>{STATE_LABEL[state] || state} {n}</span>
     {/each}
@@ -200,6 +213,7 @@
   /* .select is styled globally in app.css for a consistent modern look */
   .statusbar { font-size: 11px; color: var(--color-text-secondary); flex-wrap: wrap; }
   .cnt { display: inline-flex; align-items: center; gap: 4px; }
+  .cost { font-family: var(--font-mono); font-size: 11px; color: var(--color-text-secondary); }
   .cnt i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
   .empty { padding: 40px; text-align: center; color: var(--color-text-tertiary); font-size: 13px; }
   .office-wrap { position: relative; height: calc(100vh - 175px); min-height: 440px; border: 0.5px solid var(--color-border-tertiary);
