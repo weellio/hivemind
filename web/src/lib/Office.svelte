@@ -350,39 +350,44 @@
         const scale = isRoot ? 1.25 : 0.85;
 
         // Trips: active sub-agents walk to their parent to check in; idle/done
-        // agents occasionally wander to the water cooler for a break. Both follow
-        // the curved walkways (around other desks).
+        // agents occasionally wander to the water cooler, hang out a few seconds,
+        // then return. Both follow the curved walkways (around other desks).
         let drawX = d.x, drawY = d.y, walking = false, bubble = false;
         if (!d.walk && t > walkStagger) {
-          let tx = null, ty = null, kind = null;
-          if ((agent.state === 'idle' || agent.state === 'done') && t > (d.nextBreakAt || 0)) {
-            tx = cooler.x; ty = cooler.y - 14; kind = 'break';
-            d.nextBreakAt = t + 16 + d.seed * 22; // occasional, staggered per agent
+          let tx = null, ty = null, kind = null, pause = 0.6, outDur = 1.1, backDur = 1.1;
+          if (agent.state === 'idle' || agent.state === 'done') {
+            if (d.nextBreakAt == null) d.nextBreakAt = t + 8 + Math.random() * 30; // first visit is staggered
+            if (t > d.nextBreakAt) {
+              const ang = d.seed * Math.PI * 2;                 // stand at a personal spot around the cooler
+              tx = cooler.x + Math.cos(ang) * 16;
+              ty = cooler.y - 12 + Math.sin(ang) * 7;
+              kind = 'break'; outDur = 1.3; backDur = 1.3; pause = 3 + Math.random() * 3; // hang 3–6s
+              d.nextBreakAt = t + 30 + Math.random() * 45;       // ≥30s, randomized, until next visit
+            }
           } else if (!isRoot && d.parentDeskId && ACTIVE.has(agent.state) && t > d.nextWalkAt) {
             const parent = desks.get(d.parentDeskId);
             if (parent) { tx = parent.x; ty = parent.y - 24; kind = 'report'; d.nextWalkAt = t + 6 + d.seed * 8; }
           }
           if (kind) {
             const c = detour(d.x, d.y, tx, ty, agent.id, d.parentDeskId);
-            d.walk = { start: t, dur: kind === 'break' ? 3.4 : 2.4, hx: d.x, hy: d.y, px: tx, py: ty, cx: c.cx, cy: c.cy, kind };
-            walkStagger = t + 0.7; // stagger global starts
+            d.walk = { start: t, hx: d.x, hy: d.y, px: tx, py: ty, cx: c.cx, cy: c.cy, kind, outDur, pause, backDur };
+            walkStagger = t + 0.7; // don't let two leave on the same frame
           }
         }
         if (d.walk) {
           const w = d.walk;
-          const p = (t - w.start) / w.dur; // 0..1 over whole trip
-          // home -> target (0..0.4), pause (0.4..0.6), target -> home (0.6..1)
-          if (p >= 1) {
-            d.walk = null;
-          } else if (p < 0.4) {
-            const q = qbez(easeIO(p / 0.4), w.hx, w.hy, w.cx, w.cy, w.px, w.py);
+          const tt = t - w.start;
+          if (tt < w.outDur) {                                   // walk out
+            const q = qbez(easeIO(tt / w.outDur), w.hx, w.hy, w.cx, w.cy, w.px, w.py);
             drawX = q.x; drawY = q.y; walking = true;
-          } else if (p < 0.6) {
-            drawX = w.px; drawY = w.py;
-            bubble = w.kind === 'report'; // chat bubble only when reporting in
+          } else if (tt < w.outDur + w.pause) {                  // hang out / chat
+            drawX = w.px; drawY = w.py; bubble = true;
+          } else if (tt < w.outDur + w.pause + w.backDur) {      // walk back
+            const k = (tt - w.outDur - w.pause) / w.backDur;
+            const q = qbez(1 - easeIO(k), w.hx, w.hy, w.cx, w.cy, w.px, w.py);
+            drawX = q.x; drawY = q.y; walking = true;
           } else {
-            const q = qbez(1 - easeIO((p - 0.6) / 0.4), w.hx, w.hy, w.cx, w.cy, w.px, w.py);
-            drawX = q.x; drawY = q.y; walking = true;
+            d.walk = null;
           }
         }
 
