@@ -4,6 +4,7 @@ node_modules/
 # Runtime state
 bridge/aoc-mutes.json
 bridge/aoc-config.json
+bridge/aoc-registry.json
 
 # Captured stream-json samples (regenerated on demand)
 samples/*.jsonl

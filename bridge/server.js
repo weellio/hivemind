@@ -43,6 +43,24 @@ function webRoot() {
 const agents = new Map();
 const VALID_STATES = ['idle', 'thinking', 'coding', 'spawning', 'reading', 'error', 'testing', 'done', 'awaiting'];
 
+// Persist the registry so a bridge restart doesn't lose the picture. Entries
+// older than 12h are dropped on load (stale sessions from long-gone runs).
+const REG_FILE = path.join(__dirname, 'aoc-registry.json');
+let saveTimer = null;
+function saveRegistry() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    try { fs.writeFileSync(REG_FILE, JSON.stringify(Array.from(agents.values()))); } catch (_) {}
+  }, 500);
+}
+(function loadRegistry() {
+  try {
+    const arr = JSON.parse(fs.readFileSync(REG_FILE, 'utf8'));
+    const cutoff = Date.now() - 12 * 3600 * 1000;
+    for (const a of arr) if ((a.updatedAt || 0) >= cutoff) agents.set(String(a.id), a);
+  } catch (_) {}
+})();
+
 // Per-project mute list (the per-project "opt-in" control): hook events from a
 // muted project are dropped. Persisted so the choice survives bridge restarts.
 const MUTE_FILE = path.join(__dirname, 'aoc-mutes.json');
@@ -193,9 +211,11 @@ function upsert(ev) {
     const cur = agents.get(id);
     if (cur && cur.root) {           // keep session roots; just return them to idle
       cur.state = 'idle'; cur.updatedAt = Date.now();
+      saveRegistry();
       return { ok: true, kept: id };
     }
     agents.delete(id);
+    saveRegistry();
     return { ok: true, removed: id };
   }
 
@@ -220,6 +240,7 @@ function upsert(ev) {
   }
   existing.updatedAt = Date.now();
   agents.set(id, existing);
+  saveRegistry();
   return { ok: true, agent: existing };
 }
 
@@ -446,7 +467,7 @@ const server = http.createServer(async (req, res) => {
     if (unmute) muted.delete(body.project); else muted.add(body.project);
     saveMutes();
     // When muting, drop that project's existing tiles so it leaves the grid immediately.
-    if (!unmute) for (const [k, a] of agents) if ((a.project || 'unknown') === body.project) agents.delete(k);
+    if (!unmute) { for (const [k, a] of agents) if ((a.project || 'unknown') === body.project) agents.delete(k); saveRegistry(); }
     console.log(`[mute] ${body.project} -> ${unmute ? 'unmuted' : 'muted'}`);
     return sendJson(res, 200, { ok: true, muted: [...muted] });
   }
@@ -481,6 +502,7 @@ const server = http.createServer(async (req, res) => {
 
   if (url === '/api/reset' && req.method === 'POST') {
     agents.clear();
+    saveRegistry();
     console.log('[reset] registry cleared');
     return sendJson(res, 200, { ok: true });
   }
