@@ -179,7 +179,7 @@
   .cnt { display: inline-flex; align-items: center; gap: 4px; }
   .cnt i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
   .empty { padding: 40px; text-align: center; color: var(--color-text-tertiary); font-size: 13px; }
-  .office-wrap, .tree-wrap { height: calc(100vh - 175px); min-height: 440px; border: 0.5px solid var(--color-border-tertiary);
+  .office-wrap, .tree-wrap { position: relative; height: calc(100vh - 175px); min-height: 440px; border: 0.5px solid var(--color-border-tertiary);
     border-radius: var(--border-radius-lg); overflow: auto; background: var(--color-background-primary); }
   code { font-family: var(--font-mono); background: var(--color-background-primary); padding: 1px 5px; border-radius: 4px; }
 
