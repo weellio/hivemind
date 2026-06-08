@@ -429,11 +429,11 @@
       const live = new Set(list.map((a) => a.id));
       for (const k of desks.keys()) if (!live.has(k)) desks.delete(k);
 
-      // break area: park the water cooler below-left of ALL desks so the swarm
-      // doesn't engulf it (the cubicle grid grows right/down over a fixed spot).
-      let _minX = Infinity, _maxY = -Infinity;
-      for (const d of desks.values()) if (d.homeX != null) { if (d.homeX < _minX) _minX = d.homeX; if (d.homeY > _maxY) _maxY = d.homeY; }
-      const cooler = (_maxY === -Infinity) ? { x: 42, y: H - 44 } : { x: Math.max(40, _minX - 28), y: _maxY + 86 };
+      // break area: park the water cooler at TOP-CENTRE, above all desks — the top
+      // is sparse (just orchestrators) while workers pile up below, so it stays clear.
+      let _minX = Infinity, _maxX = -Infinity, _minY = Infinity;
+      for (const d of desks.values()) if (d.homeX != null) { if (d.homeX < _minX) _minX = d.homeX; if (d.homeX > _maxX) _maxX = d.homeX; if (d.homeY < _minY) _minY = d.homeY; }
+      const cooler = (_minY === Infinity) ? { x: W / 2, y: 40 } : { x: (_minX + _maxX) / 2, y: _minY - 74 };
 
       // ── circuit traces from each orchestrator to its sub-agents ──
       // Octilinear (H/V + 45° corners) routed through a horizontal trunk under the
