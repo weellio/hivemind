@@ -59,49 +59,48 @@ function drawDesk(ctx, accent, isError) {
 
 // ── the person, seen from above ──────────────────────────────────────────────
 // dy shifts the whole figure vertically (idle leans back = sits lower in frame).
+// Hand-drawn vector shapes (from assets/avatar-templates/desk-base_b.svg), authored
+// on a 336x276 art board; we scale them into the 120x100 logical space. Lazily
+// built so module load never needs Path2D (browser-only).
+const ART_SX = 120 / 336, ART_SY = 100 / 276;
+let _paths = null;
+function paths() {
+  if (_paths) return _paths;
+  if (typeof Path2D === 'undefined') return null;
+  _paths = {
+    hair: new Path2D('M171.07,20.78c6.51,0,7.87,11.11,15.7,8.89,10.96-3.11,18.76,14.27,11.22,24.33-12.85,17.15-12.73,28.41-29.3,28.41s-17.78-10.41-30.7-28.41c-7.31-10.18.49-13.1,5.22-24.19,3.19-7.48,21.31-9.04,27.85-9.04Z'),
+    sheen: new Path2D('M156.87,24.93c5.83-1.24,6.53,8.65,11.13,14.52,3.07,3.92,11.68.99,9.44,6.52-5.04,12.44.38,29.72-9.35,31.78s-15.41-6.09-18.51-20.67c-1.55-7.29-7.96-12.3-2.52-16.15,4.79-3.39,4.94-14.97,9.8-16Z'),
+    face: new Path2D('M168,61.52c5.04,0,9.54-5.27,12.57-2.36,2.45,2.36,3.93,5.41,3.93,8.74,0,5.45-4,13.96-9.69,16.09-2.09.78-8.96,0-11.41,0-9.11,0-11.91-8.64-11.91-16.09,0-3.16,1.33-6.07,3.55-8.37,3.02-3.13,7.7,1.98,12.95,1.98Z'),
+    shoulders: new Path2D('M98.93,118.11c.43-18.78,4.98-26.64,26.96-30.61,1.88-.34,3.79-.5,5.7-.5h72.84c1.91,0,3.82.16,5.7.5,21.98,3.97,26.29,8.12,26.29,26.9,0,6.26-15.8,18.58-18.67,23.59l-8.15,24.7c-5.01,8.77,3.28,12.49-6.75,13.7-23.23,2.8-46.79,4.85-69.68,0-8.01-1.7.74-2.97-4.27-11.75l-4.19-25.65c-2.87-5.02-25.91-15.11-25.78-20.89Z'),
+    collar: new Path2D('M140.63,85.79l26.74,39.73,30.22-41.48-19.09,2.96-10.5,21-10.5-21-16.87-1.21Z'),
+    neck: (() => { const p = new Path2D(); p.rect(157.5, 72, 21, 33); return p; })(),
+  };
+  return _paths;
+}
+
 function drawBody(ctx, shirt, dy) {
-  const sy = 32 + dy;            // shoulder line (sits just behind the head)
-  // Short neck (skin) between head and collar.
-  ctx.fillStyle = SKIN;
-  rr(ctx, CX - 3.5, sy - 4, 7, 10, 3); ctx.fill();
-  // Shoulders: tapered "deltoid" shape — broad at the shoulder line, narrowing
-  // toward the desk (front). Reads as a person in a shirt, not a round pill.
-  ctx.fillStyle = shirt;
-  ctx.beginPath();
-  ctx.moveTo(CX - 25, sy + 16);                                  // outer left shoulder
-  ctx.quadraticCurveTo(CX - 27, sy + 3, CX - 13, sy + 1);        // round up to collar
-  ctx.lineTo(CX + 13, sy + 1);                                   // collar line
-  ctx.quadraticCurveTo(CX + 27, sy + 3, CX + 25, sy + 16);       // round down to right shoulder
-  ctx.lineTo(CX + 17, sy + 30);                                  // taper in toward the front
-  ctx.quadraticCurveTo(CX, sy + 33, CX - 17, sy + 30);
-  ctx.closePath(); ctx.fill();
-  // Collar V (darker shade) opening toward the desk.
-  ctx.fillStyle = shade(shirt, -0.28);
-  ctx.beginPath();
-  ctx.moveTo(CX - 8, sy + 2); ctx.lineTo(CX, sy + 12); ctx.lineTo(CX + 8, sy + 2);
-  ctx.lineTo(CX + 5, sy); ctx.lineTo(CX, sy + 8); ctx.lineTo(CX - 5, sy);
-  ctx.closePath(); ctx.fill();
-  // Subtle highlight along the shoulder line.
-  ctx.fillStyle = rgba('#FFFFFF', 0.08);
-  rr(ctx, CX - 19, sy + 2, 38, 4, 3); ctx.fill();
+  const p = paths();
+  if (!p) return;
+  ctx.save();
+  ctx.translate(0, dy);
+  ctx.scale(ART_SX, ART_SY);
+  ctx.fillStyle = SKIN; ctx.fill(p.neck);
+  ctx.fillStyle = shirt; ctx.fill(p.shoulders);           // recolored per-agent (was flat #ff0)
+  ctx.fillStyle = shade(shirt, -0.28); ctx.fill(p.collar);
+  ctx.restore();
 }
 
 function drawHead(ctx, hair, turn, dy) {
-  // turn (in px) nudges the head left/right for reading/searching glances.
-  const hx = CX + turn, hy = 22 + dy;
-  // Head: an egg-shaped oval (taller front-to-back than wide) so it doesn't read
-  // as a round blob. Hair is the dominant shape with a swept part.
-  ctx.fillStyle = hair;
-  ctx.beginPath(); ctx.ellipse(hx, hy, 10, 12.5, 0, 0, Math.PI * 2); ctx.fill();
-  // Swept hair sheen, offset to one side.
-  ctx.fillStyle = shade(hair, 0.18);
-  ctx.beginPath(); ctx.ellipse(hx - 2.4, hy - 1.5, 6, 9, -0.22, 0, Math.PI * 2); ctx.fill();
-  // Darker part line.
-  ctx.strokeStyle = shade(hair, -0.22); ctx.lineWidth = 1; ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.moveTo(hx + 1.5, hy - 9.5); ctx.quadraticCurveTo(hx + 4, hy - 1, hx + 2, hy + 6); ctx.stroke();
-  // Face/forehead sliver toward the front (laptop).
-  ctx.fillStyle = SKIN;
-  ctx.beginPath(); ctx.ellipse(hx, hy + 9, 5.5, 4.5, 0, 0, Math.PI * 2); ctx.fill();
+  // turn (px, 120-space) nudges the head for reading/searching glances; dy leans idle down.
+  const p = paths();
+  if (!p) return;
+  ctx.save();
+  ctx.translate(turn, dy);
+  ctx.scale(ART_SX, ART_SY);
+  ctx.fillStyle = hair; ctx.fill(p.hair);
+  ctx.fillStyle = shade(hair, 0.18); ctx.fill(p.sheen);
+  ctx.fillStyle = SKIN; ctx.fill(p.face);
+  ctx.restore();
 }
 
 // One arm reaching from a shoulder to a target point (top-down "tube").
