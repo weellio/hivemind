@@ -90,39 +90,44 @@
   const PHRASES = ['hi', 'how are you?', 'gotta run', "where's the TPS report?", 'haha', 'coffee?', 'busy day',
     'nice work', 'ugh, bugs', 'lunch?', 'did you see that?', 'on it 👍', 'morning!', 'so close', 'standup?'];
 
-  // ── layout: RADIAL — orchestrators near the centre, sub-agents fanned outward ──
+  // ── layout: CUBICLES — each orchestrator leads a tidy grid of its sub-agents.
+  // Team blocks flow left→right and wrap; everything is framed by Fit.
   function layout(tree, W, H) {
     const { roots, children } = tree;
-    const cx = W / 2, cy = H / 2;
-    const n = Math.max(1, roots.length);
-    const rot = -Math.PI / 2;                  // first root starts at the top
-    const Rx = W * 0.17, Ry = H * 0.20;         // inner ring (roots)
-    const Rx2 = W * 0.36, Ry2 = H * 0.38;       // outer ring (sub-agents)
-    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const CELLW = 92, CELLH = 84, ROOTH = 94, PADX = 46, PADY = 40, GAP = 38;
+    const maxCols = Math.max(1, Math.floor((W - 2 * PADX) / CELLW));
+    let curX = PADX, curY = PADY, bandH = 0;
 
-    roots.forEach((root, i) => {
-      const rd = getDesk(root.id);
-      const rootA = n === 1 ? -Math.PI / 2 : rot + (i / n) * Math.PI * 2;
-      const rx = n === 1 ? cx : cx + Math.cos(rootA) * Rx;
-      const ry = n === 1 ? cy : cy + Math.sin(rootA) * Ry;
-      rd.tx = rx; rd.ty = ry; rd.isRoot = true; rd.homeX = rx; rd.homeY = ry;
-
+    roots.forEach((root) => {
       const subs = children.get(root.id) || [];
       const m = subs.length;
-      // angular wedge for this root's subs, capped to its share of the circle
-      let wedge = Math.min(2.4, 0.6 + m * 0.18);
-      if (n > 1) wedge = Math.min(wedge, (2 * Math.PI / n) * 0.85);
+      // a roughly-square grid, a touch wider than tall, capped to the viewport
+      const cols = m ? Math.min(maxCols, Math.max(1, Math.round(Math.sqrt(m) * 1.3))) : 1;
+      const rows = m ? Math.ceil(m / cols) : 0;
+      const blockW = Math.max(CELLW, cols * CELLW);
+      const blockH = ROOTH + rows * CELLH;
+
+      // wrap to a new band when this team would overflow the row
+      if (curX + blockW > W - PADX && curX > PADX) { curX = PADX; curY += bandH + GAP; bandH = 0; }
+
+      // orchestrator centred above its cubicle grid
+      const rd = getDesk(root.id);
+      const rootX = curX + blockW / 2, rootY = curY + ROOTH / 2;
+      rd.tx = rootX; rd.ty = rootY; rd.isRoot = true; rd.homeX = rootX; rd.homeY = rootY;
 
       subs.forEach((sub, j) => {
+        const col = j % cols, row = Math.floor(j / cols);
+        // centre the (possibly short) final row under the block
+        const rowCount = (row === rows - 1) ? (m - row * cols) : cols;
+        const x0 = curX + (blockW - rowCount * CELLW) / 2;
         const sd = getDesk(sub.id);
-        let ang;
-        if (n === 1) ang = rot + (j / Math.max(1, m)) * Math.PI * 2;      // full circle around the centre
-        else { const frac = m === 1 ? 0 : (j / (m - 1)) - 0.5; ang = rootA + frac * wedge; }
-        const ring = 1 + (j % 2) * 0.16;        // alternate radius a touch to de-overlap
-        sd.tx = clamp(cx + Math.cos(ang) * Rx2 * ring, 46, W - 46);
-        sd.ty = clamp(cy + Math.sin(ang) * Ry2 * ring, 46, H - 52);
+        sd.tx = x0 + col * CELLW + CELLW / 2;
+        sd.ty = curY + ROOTH + row * CELLH + CELLH / 2;
         sd.isRoot = false; sd.homeX = sd.tx; sd.homeY = sd.ty; sd.parentDeskId = root.id;
       });
+
+      curX += blockW + GAP;
+      bandH = Math.max(bandH, blockH);
     });
   }
 
@@ -302,6 +307,7 @@
 
   // ── pan / zoom (applied to the canvas transform) ──
   let zoom = $state(1), panX = $state(0), panY = $state(0), dragging = $state(false);
+  let autoFitted = false;
   let drag = null;
   let selectedId = $state(null);   // clicked agent → modal
   let hitTargets = [];             // {id,x,y,r} in world coords, rebuilt each frame
@@ -313,7 +319,17 @@
     panX = sx - wx * nz; panY = sy - wy * nz; zoom = nz;
   }
   function zoomBy(f) { if (canvas) { const r = canvas.getBoundingClientRect(); zoomAt(r.width / 2, r.height / 2, zoom * f); } }
-  function fitView() { zoom = 1; panX = 0; panY = 0; }
+  function fitView() {
+    const ds = Array.from(desks.values()).filter((d) => d.homeX != null);
+    if (!ds.length || !cssW || !cssH) { zoom = 1; panX = 0; panY = 0; return; }
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const d of ds) { minX = Math.min(minX, d.homeX); maxX = Math.max(maxX, d.homeX); minY = Math.min(minY, d.homeY); maxY = Math.max(maxY, d.homeY); }
+    const pad = 80;
+    minX -= pad; minY -= pad; maxX += pad; maxY += pad;
+    const bw = Math.max(1, maxX - minX), bh = Math.max(1, maxY - minY);
+    const z = Math.min(cssW / bw, cssH / bh, 1.5);
+    zoom = z; panX = (cssW - bw * z) / 2 - minX * z; panY = (cssH - bh * z) / 2 - minY * z;
+  }
   function onWheel(e) { e.preventDefault(); const r = canvas.getBoundingClientRect(); zoomAt(e.clientX - r.left, e.clientY - r.top, zoom * (e.deltaY < 0 ? 1.12 : 0.89)); }
   function onPointerDown(e) {
     if (e.target.closest && e.target.closest('.zoomctl')) return;
@@ -359,6 +375,8 @@
       const list = agents || [];
       const tree = buildTree(list);
       layout(tree, W, H);
+      // frame everything once on first population so a big team isn't off-screen
+      if (!autoFitted && desks.size && Array.from(desks.values()).some((d) => d.homeX != null)) { fitView(); autoFitted = true; }
       const cooler = { x: 42, y: H - 44 }; // break destination (bottom-left)
 
       // prune desks for agents that vanished
