@@ -63,9 +63,9 @@
       if (nextLeafX > startLeaf) nextLeafX += TREE_GAP / H_PITCH;
     }
 
-    // Flatten nodes with final pixel coords; collect parent→child links.
+    // Flatten nodes with base pixel coords; collect parent→child edges (by id).
     const nodes = [];
-    const links = [];
+    const edges = [];
     const seenFlat = new Set();
     function collect(node) {
       if (seenFlat.has(node)) return;
@@ -73,32 +73,55 @@
       const px = node.x + PAD;
       const py = node.depth * ROW_H + PAD;
       node.px = px; node.py = py;
-      nodes.push({ id: node.id, agent: node.agent, x: px, y: py });
+      nodes.push({ id: node.id, agent: node.agent, bx: px, by: py });
       for (const c of node.children) {
         collect(c);
-        const color = STATE_COLORS[c.agent.state] || 'var(--color-border-secondary)';
-        links.push({
-          x1: px + NODE_W / 2, y1: py + NODE_H,            // parent bottom-center
-          x2: c.px + NODE_W / 2, y2: c.py,                 // child top-center
-          color,
-        });
+        edges.push({ parentId: node.id, childId: c.id, color: STATE_COLORS[c.agent.state] || 'var(--color-border-secondary)' });
       }
     }
     for (const r of roots) collect(r);
 
-    let width = PAD * 2;
-    let height = PAD * 2;
+    let width = PAD * 2, height = PAD * 2;
     for (const n of nodes) {
-      width = Math.max(width, n.x + NODE_W + PAD);
-      height = Math.max(height, n.y + NODE_H + PAD);
+      width = Math.max(width, n.bx + NODE_W + PAD);
+      height = Math.max(height, n.by + NODE_H + PAD);
     }
-    return { nodes, links, width, height };
+    return { nodes, edges, baseWidth: width, baseHeight: height };
   });
 
+  // ── manual arrangement: per-agent position overrides (persisted) ──
+  let overrides = $state(loadPos());
+  function loadPos() { try { return JSON.parse(localStorage.getItem('aoc-tree-pos')) || {}; } catch (_) { return {}; } }
+  function savePos() { try { localStorage.setItem('aoc-tree-pos', JSON.stringify(overrides)); } catch (_) {} }
+  // Stable key so an arrangement persists across sessions (by project / role).
+  function keyFor(a) { const proj = a.project || 'unknown'; return a.root ? 'root:' + proj : 'sub:' + proj + ':' + (a.name || a.id); }
+
+  // Live positions = tidy-tree base, overridden by any manual placement.
+  let pos = $derived.by(() => {
+    const m = {};
+    for (const n of model.nodes) { const o = overrides[keyFor(n.agent)]; m[n.id] = o ? { x: o.x, y: o.y } : { x: n.bx, y: n.by }; }
+    return m;
+  });
+  let bounds = $derived.by(() => {
+    let w = 240, h = 240;
+    for (const n of model.nodes) { const p = pos[n.id]; if (p) { w = Math.max(w, p.x + NODE_W + PAD); h = Math.max(h, p.y + NODE_H + PAD); } }
+    return { w, h };
+  });
+
+  let nodeDrag = null;
+  function nodeDown(e, n) {
+    if (e.target.closest && e.target.closest('.ctl')) return;  // let the command row work
+    e.stopPropagation();                                        // don't pan the view
+    const p = pos[n.id];
+    nodeDrag = { key: keyFor(n.agent), sx: e.clientX, sy: e.clientY, bx: p.x, by: p.y };
+    viewport && viewport.setPointerCapture?.(e.pointerId);
+  }
+  function resetLayout() { overrides = {}; savePos(); fitted = false; }
+
   // Build an orthogonal elbow path: down from parent, across, down into child.
-  function elbow(l) {
-    const midY = (l.y1 + l.y2) / 2;
-    return `M ${l.x1} ${l.y1} V ${midY} H ${l.x2} V ${l.y2}`;
+  function elbow(x1, y1, x2, y2) {
+    const midY = (y1 + y2) / 2;
+    return `M ${x1} ${y1} V ${midY} H ${x2} V ${y2}`;
   }
 
   // ── root command row (mirrors AgentTile.svelte) ──
@@ -131,7 +154,7 @@
   function doFit() {
     if (!viewport) return;
     const vw = viewport.clientWidth, vh = viewport.clientHeight;
-    const tw = model.width, th = model.height;
+    const tw = bounds.w, th = bounds.h;
     if (!tw || !th || !vw || !vh) return;
     zoom = clamp(0.15, 1.5, Math.min(vw / tw, vh / th) * 0.95);
     panX = Math.max(0, (vw - tw * zoom) / 2);
@@ -149,21 +172,25 @@
     zoomAt(e.clientX - r.left, e.clientY - r.top, zoom * (e.deltaY < 0 ? 1.12 : 0.89));
   }
   function onPointerDown(e) {
-    if (e.target.closest && e.target.closest('.node')) return; // don't pan when using a card
+    if (e.target.closest && (e.target.closest('.node') || e.target.closest('.zoom'))) return; // cards & toolbar handle their own clicks
     dragging = true;
     drag = { x: e.clientX, y: e.clientY, px: panX, py: panY };
     viewport.setPointerCapture?.(e.pointerId);
   }
   function onPointerMove(e) {
+    if (nodeDrag) {
+      overrides = { ...overrides, [nodeDrag.key]: { x: nodeDrag.bx + (e.clientX - nodeDrag.sx) / zoom, y: nodeDrag.by + (e.clientY - nodeDrag.sy) / zoom } };
+      return;
+    }
     if (!dragging || !drag) return;
     panX = drag.px + (e.clientX - drag.x);
     panY = drag.py + (e.clientY - drag.y);
   }
-  function onPointerUp() { dragging = false; drag = null; }
+  function onPointerUp() { if (nodeDrag) { savePos(); nodeDrag = null; } dragging = false; drag = null; }
 
   // Auto-fit once the viewport + model are ready.
   $effect(() => {
-    if (!fitted && viewport && model.width > 0) { fitted = true; doFit(); }
+    if (!fitted && viewport && model.nodes.length > 0) { fitted = true; doFit(); }
   });
 </script>
 
@@ -175,17 +202,21 @@
     <span>{Math.round(zoom * 100)}%</span>
     <button onclick={() => zoomBy(1.2)} title="Zoom in">+</button>
     <button class="fit" onclick={doFit} title="Fit to screen">Fit</button>
+    <button class="fit" onclick={resetLayout} title="Reset manual arrangement">Reset</button>
   </div>
-  <div class="canvas" style="width:{model.width}px; height:{model.height}px; transform: translate({panX}px, {panY}px) scale({zoom});">
-    <svg class="links" width={model.width} height={model.height} viewBox="0 0 {model.width} {model.height}" aria-hidden="true">
-      {#each model.links as l, i (i)}
-        <path class="elbow" d={elbow(l)} style="--lc:{l.color}" />
+  <div class="canvas" style="width:{bounds.w}px; height:{bounds.h}px; transform: translate({panX}px, {panY}px) scale({zoom});">
+    <svg class="links" width={bounds.w} height={bounds.h} viewBox="0 0 {bounds.w} {bounds.h}" aria-hidden="true">
+      {#each model.edges as e, i (i)}
+        {@const p = pos[e.parentId]}
+        {@const c = pos[e.childId]}
+        {#if p && c}<path class="elbow" d={elbow(p.x + NODE_W / 2, p.y + NODE_H, c.x + NODE_W / 2, c.y)} style="--lc:{e.color}" />{/if}
       {/each}
     </svg>
 
     {#each model.nodes as n (n.id)}
       {@const color = STATE_COLORS[n.agent.state] || '#6B7280'}
-      <div class="node" class:idle={n.agent.state === 'idle'} style="left:{n.x}px; top:{n.y}px; width:{NODE_W}px; --c:{color}">
+      {@const p = pos[n.id]}
+      <div class="node" class:idle={n.agent.state === 'idle'} style="left:{p.x}px; top:{p.y}px; width:{NODE_W}px; --c:{color}" onpointerdown={(e) => nodeDown(e, n)}>
         <div class="head">
           <span class="name" title={n.agent.name}>{n.agent.name || n.id}</span>
         </div>
@@ -237,7 +268,7 @@
   .elbow { fill: none; stroke: var(--lc, var(--color-border-secondary)); stroke-width: 1.5; opacity: 0.75; }
 
   .node {
-    position: absolute; z-index: 1; box-sizing: border-box;
+    position: absolute; z-index: 1; box-sizing: border-box; cursor: grab;
     background: var(--color-background-primary);
     border: 0.5px solid var(--color-border-tertiary);
     border-left: 3px solid var(--c);
@@ -245,6 +276,7 @@
     padding: 8px; display: flex; flex-direction: column; gap: 6px; align-items: stretch;
   }
   .node.idle { opacity: 0.7; }
+  .node .ctl { cursor: auto; }
 
   .head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
   .name { font-size: 12px; font-weight: 500; color: var(--color-text-primary);
