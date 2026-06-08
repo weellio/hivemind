@@ -288,9 +288,11 @@ function openPath(p, target) {
 }
 
 // Launch a Claude Code session in a new terminal at cwd (optionally resuming one).
-function launchSession(cwd, resume) {
+function launchSession(cwd, resume, prompt) {
   if (resume && !/^[\w-]+$/.test(resume)) return { error: 'bad session id' };
-  const inner = resume ? `claude --resume ${resume}` : 'claude';
+  // optional initial task: strip quotes/newlines, cap length, wrap for the shell
+  const task = prompt ? String(prompt).replace(/["\r\n]+/g, ' ').trim().slice(0, 1500) : '';
+  const inner = resume ? `claude --resume ${resume}` : (task ? `claude "${task}"` : 'claude');
   try {
     if (process.platform === 'win32') {
       spawn(`start "Hivemind: Claude" cmd /k ${inner}`, { cwd, shell: true, detached: true, stdio: 'ignore' }).unref();
@@ -652,7 +654,7 @@ const server = http.createServer(async (req, res) => {
     const body = await readBody(req);
     if (!body || !body.cwd) return sendJson(res, 400, { error: 'cwd required' });
     if (!fs.existsSync(body.cwd)) return sendJson(res, 400, { error: 'path not found' });
-    const r = launchSession(body.cwd, body.resume);
+    const r = launchSession(body.cwd, body.resume, body.prompt);
     return sendJson(res, r.error ? 400 : 200, r);
   }
 

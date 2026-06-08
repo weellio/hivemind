@@ -29,7 +29,14 @@
 
   let busy = $state('');
   let commitMsg = $state({});
-  async function launch(p) { busy = p.path + ':launch'; const j = await post('/api/launch', { cwd: p.path }); result = j && j.ok ? `Started a Claude session in ${p.name}` : 'Could not launch'; busy = ''; }
+  let startPrompt = $state({});
+  async function launch(p) {
+    busy = p.path + ':launch';
+    const task = (startPrompt[p.path] || '').trim();
+    const j = await post('/api/launch', { cwd: p.path, prompt: task });
+    result = j && j.ok ? `Started${task ? ' with a task' : ''} in ${p.name}` : 'Could not launch';
+    busy = ''; startPrompt = { ...startPrompt, [p.path]: '' };
+  }
   async function openIn(p, target) { await post('/api/open', { cwd: p.path, target }); }
   async function gitDo(p, action) {
     busy = p.path + ':' + action;
@@ -122,7 +129,8 @@
           {#if expanded[p.path]}
             <div class="comps">
               <div class="acts">
-                <button class="select" onclick={() => launch(p)} disabled={!!busy} title="Open a new terminal running Claude Code here">▶ Start</button>
+                <button class="select" onclick={() => launch(p)} disabled={!!busy} title="Open a new terminal running Claude Code here (with the task if given)">▶ Start</button>
+                <input class="cm" placeholder="task (optional)…" bind:value={startPrompt[p.path]} onkeydown={(e) => e.key === 'Enter' && launch(p)} />
                 <button class="select" onclick={() => openIn(p, 'folder')} title="Open folder">📂</button>
                 <button class="select" onclick={() => openIn(p, 'editor')} title="Open in VS Code">Code</button>
                 {#if gitMap[p.path]?.isRepo}
