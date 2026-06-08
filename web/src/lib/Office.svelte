@@ -81,45 +81,38 @@
   const PHRASES = ['hi', 'how are you?', 'gotta run', "where's the TPS report?", 'haha', 'coffee?', 'busy day',
     'nice work', 'ugh, bugs', 'lunch?', 'did you see that?', 'on it 👍', 'morning!', 'so close', 'standup?'];
 
-  // ── layout: deterministic target positions in normalized 0..1 space ──
+  // ── layout: RADIAL — orchestrators near the centre, sub-agents fanned outward ──
   function layout(tree, W, H) {
     const { roots, children } = tree;
+    const cx = W / 2, cy = H / 2;
     const n = Math.max(1, roots.length);
-    const cols = Math.min(n, Math.max(1, Math.ceil(Math.sqrt(n * 1.4))));
-    const margX = 0.10, topY = 0.18;
+    const rot = -Math.PI / 2;                  // first root starts at the top
+    const Rx = W * 0.17, Ry = H * 0.20;         // inner ring (roots)
+    const Rx2 = W * 0.36, Ry2 = H * 0.38;       // outer ring (sub-agents)
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
     roots.forEach((root, i) => {
-      const col = i % cols;
-      const colCount = Math.min(cols, n - (Math.floor(i / cols) * cols));
-      const rowBlock = Math.floor(i / cols);
-      const rootRows = Math.ceil(n / cols);
-      const cx = margX + ((col + 0.5) / Math.max(1, colCount)) * (1 - 2 * margX);
-      const cy = topY + (rootRows > 1 ? (rowBlock / (rootRows)) * 0.30 : 0);
-
       const rd = getDesk(root.id);
-      rd.tx = cx * W;
-      rd.ty = cy * H;
-      rd.isRoot = true;
-      rd.homeX = rd.tx; rd.homeY = rd.ty;
+      const rootA = n === 1 ? -Math.PI / 2 : rot + (i / n) * Math.PI * 2;
+      const rx = n === 1 ? cx : cx + Math.cos(rootA) * Rx;
+      const ry = n === 1 ? cy : cy + Math.sin(rootA) * Ry;
+      rd.tx = rx; rd.ty = ry; rd.isRoot = true; rd.homeX = rx; rd.homeY = ry;
 
-      // sub-agents cluster below/around their root
       const subs = children.get(root.id) || [];
-      const radiusX = Math.min(0.14 * W, (0.9 * W) / (cols * 2.2));
+      const m = subs.length;
+      // angular wedge for this root's subs, capped to its share of the circle
+      let wedge = Math.min(2.4, 0.6 + m * 0.18);
+      if (n > 1) wedge = Math.min(wedge, (2 * Math.PI / n) * 0.85);
+
       subs.forEach((sub, j) => {
         const sd = getDesk(sub.id);
-        const m = subs.length;
-        // arc fanned out below the root
-        const t = m === 1 ? 0.5 : j / (m - 1); // 0..1
-        const ang = Math.PI * (0.15 + 0.70 * t); // lower hemisphere-ish
-        const rr = 1 + (j % 2) * 0.55; // two rings to avoid overlap
-        sd.tx = rd.tx + Math.cos(ang) * radiusX * (0.9 + 0.5 * (rr - 1)) * 1.4;
-        sd.ty = rd.ty + 130 + Math.sin(ang) * 70 * rr + (j > 6 ? 60 : 0);
-        // clamp into view
-        sd.tx = Math.max(40, Math.min(W - 40, sd.tx));
-        sd.ty = Math.max(60, Math.min(H - 50, sd.ty));
-        sd.isRoot = false;
-        sd.homeX = sd.tx; sd.homeY = sd.ty;
-        sd.parentDeskId = root.id;
+        let ang;
+        if (n === 1) ang = rot + (j / Math.max(1, m)) * Math.PI * 2;      // full circle around the centre
+        else { const frac = m === 1 ? 0 : (j / (m - 1)) - 0.5; ang = rootA + frac * wedge; }
+        const ring = 1 + (j % 2) * 0.16;        // alternate radius a touch to de-overlap
+        sd.tx = clamp(cx + Math.cos(ang) * Rx2 * ring, 46, W - 46);
+        sd.ty = clamp(cy + Math.sin(ang) * Ry2 * ring, 46, H - 52);
+        sd.isRoot = false; sd.homeX = sd.tx; sd.homeY = sd.ty; sd.parentDeskId = root.id;
       });
     });
   }
