@@ -24,6 +24,7 @@ const readline = require('readline');
 const { createParser } = require('./parser.js');
 const https = require('https');
 const license = require('./license.js');
+const projects = require('./projects.js');
 
 const argPort = (() => {
   const i = process.argv.indexOf('--port');
@@ -446,6 +447,7 @@ const server = http.createServer(async (req, res) => {
     if (!body) return sendJson(res, 400, { error: 'invalid JSON' });
     const project = projectFromCwd(body.cwd);
     if (body.session_id) lastActiveSession = body.session_id;
+    if (body.cwd) projects.noteKnown(body.cwd);   // auto-import the project
     if (muted.has(project)) return sendJson(res, 200, { ok: true, muted: project, applied: 0 });
     const rootKey = 'sess:' + (body.session_id || 'unknown');
     const prevState = agents.get(rootKey) && agents.get(rootKey).state;
@@ -524,6 +526,33 @@ const server = http.createServer(async (req, res) => {
     if (!body) return sendJson(res, 400, { error: 'invalid JSON' });
     const r = copySkill(body.fromCwd, body.toCwd, body.skill);
     if (!r.error) console.log(`[copy-skill] ${body.skill}: ${body.fromCwd} -> ${body.toCwd}`);
+    return sendJson(res, r.error ? 400 : 200, r);
+  }
+
+  if (url === '/api/projects' && req.method === 'GET') {
+    const list = projects.discover();
+    const byPath = new Map(list.map((p) => [path.resolve(p.path), p]));
+    for (const a of agents.values()) {
+      if (!a.root || !a.cwd) continue;
+      let rp; try { rp = path.resolve(a.cwd); } catch (_) { continue; }
+      if (byPath.has(rp)) byPath.get(rp).running = true;
+      else { const pr = projects.project(a.cwd); pr.running = true; pr.sources = ['session']; byPath.set(rp, pr); list.push(pr); }
+    }
+    return sendJson(res, 200, { roots: projects.getConfig().roots, projects: list });
+  }
+
+  if (url === '/api/projects/roots' && req.method === 'POST') {
+    const body = await readBody(req);
+    if (!body || !body.path) return sendJson(res, 400, { error: 'path required' });
+    const c = body.action === 'remove' ? projects.removeRoot(body.path) : projects.addRoot(body.path);
+    return sendJson(res, 200, { ok: true, roots: c.roots });
+  }
+
+  if (url === '/api/copy-component' && req.method === 'POST') {
+    const body = await readBody(req);
+    if (!body) return sendJson(res, 400, { error: 'invalid JSON' });
+    const r = projects.copyComponent(body.type, body.name, body.fromCwd, body.toCwd);
+    if (!r.error) console.log(`[copy] ${body.type} ${body.name}: ${body.fromCwd} -> ${body.toCwd}`);
     return sendJson(res, r.error ? 400 : 200, r);
   }
 
