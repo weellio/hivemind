@@ -87,6 +87,49 @@
     const r = parseInt(n.slice(0, 2), 16), g = parseInt(n.slice(2, 4), 16), b = parseInt(n.slice(4, 6), 16);
     return `rgba(${r},${g},${b},${a})`;
   }
+
+  // ── circuit-board (octilinear) routing ──
+  // Parent→child trace: down to a horizontal trunk, across to the child's column,
+  // then down — so same-column children share a vertical bus, like a PCB.
+  function connRoute(px, py, cx, cy) {
+    const trunkY = py + 46;
+    const pts = [{ x: px, y: py }, { x: px, y: trunkY }];
+    if (Math.abs(cx - px) > 2) pts.push({ x: cx, y: trunkY });
+    pts.push({ x: cx, y: cy });
+    return pts;
+  }
+  // Generic octilinear elbow between any two points: straight on the long axis, then 45°.
+  function octElbow(x1, y1, x2, y2) {
+    const dx = x2 - x1, dy = y2 - y1, adx = Math.abs(dx), ady = Math.abs(dy);
+    const sx = Math.sign(dx), sy = Math.sign(dy), diag = Math.min(adx, ady);
+    const pts = [{ x: x1, y: y1 }];
+    if (adx > ady) pts.push({ x: x1 + sx * (adx - diag), y: y1 });
+    else if (ady > adx) pts.push({ x: x1, y: y1 + sy * (ady - diag) });
+    pts.push({ x: x2, y: y2 });
+    return pts;
+  }
+  // Issue a path with 45° chamfered corners (no right angles) — the circuit look.
+  function tracePath(ctx, pts, r) {
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length - 1; i++) {
+      const a = pts[i - 1], p = pts[i], b = pts[i + 1];
+      const inLen = Math.hypot(p.x - a.x, p.y - a.y) || 1;
+      const outLen = Math.hypot(b.x - p.x, b.y - p.y) || 1;
+      const rr = Math.min(r, inLen / 2, outLen / 2);
+      ctx.lineTo(p.x - (p.x - a.x) / inLen * rr, p.y - (p.y - a.y) / inLen * rr);
+      ctx.lineTo(p.x + (b.x - p.x) / outLen * rr, p.y + (b.y - p.y) / outLen * rr);
+    }
+    ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+  }
+  // Point at fraction [0..1] along a polyline.
+  function polyPos(pts, frac) {
+    const segs = []; let total = 0;
+    for (let i = 0; i < pts.length - 1; i++) { const L = Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].y - pts[i].y); segs.push(L); total += L; }
+    let d = Math.max(0, Math.min(1, frac)) * total;
+    for (let i = 0; i < segs.length; i++) { if (d <= segs[i] || i === segs.length - 1) { const k = segs[i] ? d / segs[i] : 0; return { x: lerp(pts[i].x, pts[i + 1].x, k), y: lerp(pts[i].y, pts[i + 1].y, k) }; } d -= segs[i]; }
+    return pts[pts.length - 1];
+  }
   const PHRASES = ['hi', 'how are you?', 'gotta run', "where's the TPS report?", 'haha', 'coffee?', 'busy day',
     'nice work', 'ugh, bugs', 'lunch?', 'did you see that?', 'on it 👍', 'morning!', 'so close', 'standup?'];
 
@@ -383,29 +426,9 @@
       const live = new Set(list.map((a) => a.id));
       for (const k of desks.keys()) if (!live.has(k)) desks.delete(k);
 
-      // ── walkways from each root desk to its sub-agents (routed AROUND other desks) ──
-      // Every other desk near a straight path pushes the path's control point
-      // perpendicularly away, so the walkway bows around people instead of through.
-      const obstacles = [];
-      for (const a of list) { const dd = desks.get(a.id); if (dd && dd.homeX != null) obstacles.push({ id: a.id, x: dd.homeX, y: dd.homeY }); }
-      function detour(x1, y1, x2, y2, aId, bId) {
-        const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
-        const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy) || 1;
-        const nx = -dy / len, ny = dx / len; // unit perpendicular
-        let push = 0;
-        for (const o of obstacles) {
-          if (o.id === aId || o.id === bId) continue;
-          const tt = ((o.x - x1) * dx + (o.y - y1) * dy) / (len * len);
-          if (tt < 0.12 || tt > 0.88) continue;        // only obstacles between the desks
-          const px = x1 + dx * tt, py = y1 + dy * tt;
-          const op = (o.x - px) * nx + (o.y - py) * ny; // signed distance from the line
-          const d = Math.abs(op), R = 38;               // clearance radius
-          if (d < R) push += -Math.sign(op || 1) * (R - d) * 1.6;
-        }
-        push = Math.max(-80, Math.min(80, push));
-        return { cx: mx + nx * push * 2, cy: my + ny * push * 2 }; // *2: control point overshoots the curve
-      }
-
+      // ── circuit traces from each orchestrator to its sub-agents ──
+      // Octilinear (H/V + 45° corners) routed through a horizontal trunk under the
+      // root, so same-column workers share a vertical bus — like a PCB.
       ctx.save();
       ctx.lineCap = 'round'; ctx.lineJoin = 'round';
       for (const root of tree.roots) {
@@ -414,18 +437,20 @@
         for (const sub of tree.children.get(root.id) || []) {
           const sd = desks.get(sub.id);
           if (!sd || sd.homeX == null) continue;
-          const x1 = pd.homeX, y1 = pd.homeY, x2 = sd.homeX, y2 = sd.homeY;
-          const c = detour(x1, y1, x2, y2, root.id, sub.id);
-          // soft walkway carpet
-          ctx.strokeStyle = 'rgba(150,150,165,0.10)';
-          ctx.lineWidth = 12; ctx.setLineDash([]);
-          ctx.beginPath(); ctx.moveTo(x1, y1); ctx.quadraticCurveTo(c.cx, c.cy, x2, y2); ctx.stroke();
-          // animated dashed centre line, tinted by the sub's state, flowing parent→child
-          ctx.globalAlpha = 0.5;
-          ctx.strokeStyle = STATE_COLORS[sub.state] || '#8891a0';
-          ctx.lineWidth = 1.5; ctx.setLineDash([4, 5]); ctx.lineDashOffset = -(frameN * 0.5) % 9;
-          ctx.beginPath(); ctx.moveTo(x1, y1); ctx.quadraticCurveTo(c.cx, c.cy, x2, y2); ctx.stroke();
-          ctx.globalAlpha = 1; ctx.setLineDash([]);
+          const pts = connRoute(pd.homeX, pd.homeY, sd.homeX, sd.homeY);
+          const col = STATE_COLORS[sub.state] || '#8891a0';
+          // faint solder-mask under-trace
+          tracePath(ctx, pts, 11);
+          ctx.strokeStyle = 'rgba(150,160,185,0.10)'; ctx.lineWidth = 7; ctx.setLineDash([]); ctx.lineDashOffset = 0; ctx.stroke();
+          // animated dashed trace, tinted by the sub's state, flowing parent→child
+          tracePath(ctx, pts, 11);
+          ctx.globalAlpha = 0.55; ctx.strokeStyle = col; ctx.lineWidth = 1.4; ctx.setLineDash([5, 5]); ctx.lineDashOffset = -(frameN * 0.5) % 10; ctx.stroke();
+          ctx.setLineDash([]);
+          // solder pads (vias): at the child end and where the drop meets the trunk
+          ctx.globalAlpha = 0.85; ctx.fillStyle = col;
+          ctx.beginPath(); ctx.arc(sd.homeX, sd.homeY, 2.2, 0, Math.PI * 2); ctx.fill();
+          if (pts.length >= 3) { const tap = pts[pts.length - 2]; ctx.globalAlpha = 0.45; ctx.beginPath(); ctx.arc(tap.x, tap.y, 1.8, 0, Math.PI * 2); ctx.fill(); }
+          ctx.globalAlpha = 1;
         }
       }
       ctx.restore();
@@ -483,11 +508,11 @@
             if (parent) { tx = parent.x; ty = parent.y - 24; kind = 'report'; d.nextWalkAt = t + 6 + d.seed * 8; }
           }
           if (kind) {
-            const c = detour(d.x, d.y, tx, ty, agent.id, skipB);
+            const route = octElbow(d.x, d.y, tx, ty);   // walk straight + 45°, circuit-style
             const dist = Math.hypot(tx - d.x, ty - d.y);
             const speed = kind === 'report' ? 95 : 46;          // px/s: hurried orders vs casual stroll
             const dur = Math.max(0.6, dist / speed);
-            d.walk = { start: t, hx: d.x, hy: d.y, px: tx, py: ty, cx: c.cx, cy: c.cy, kind, pause, outDur: dur, backDur: dur, phrase };
+            d.walk = { start: t, route, px: tx, py: ty, kind, pause, outDur: dur, backDur: dur, phrase };
             walkStagger = t + 0.7; // don't let two leave on the same frame
           }
         }
@@ -495,13 +520,13 @@
           const w = d.walk;
           const tt = t - w.start;
           if (tt < w.outDur) {                                   // walk out
-            const q = qbez(easeIO(tt / w.outDur), w.hx, w.hy, w.cx, w.cy, w.px, w.py);
+            const q = polyPos(w.route, easeIO(tt / w.outDur));
             drawX = q.x; drawY = q.y; walking = true;
           } else if (tt < w.outDur + w.pause) {                  // hang out / chat
             drawX = w.px; drawY = w.py; bubble = true; chat = w.phrase || null;
           } else if (tt < w.outDur + w.pause + w.backDur) {      // walk back
             const k = (tt - w.outDur - w.pause) / w.backDur;
-            const q = qbez(1 - easeIO(k), w.hx, w.hy, w.cx, w.cy, w.px, w.py);
+            const q = polyPos(w.route, 1 - easeIO(k));
             drawX = q.x; drawY = q.y; walking = true;
           } else {
             d.walk = null;
