@@ -263,6 +263,29 @@
       const live = new Set(list.map((a) => a.id));
       for (const k of desks.keys()) if (!live.has(k)) desks.delete(k);
 
+      // ── walkways from each root desk to its sub-agents (drawn under the figures) ──
+      ctx.save();
+      for (const root of tree.roots) {
+        const pd = desks.get(root.id);
+        if (!pd || pd.homeX == null) continue;
+        for (const sub of tree.children.get(root.id) || []) {
+          const sd = desks.get(sub.id);
+          if (!sd || sd.homeX == null) continue;
+          const x1 = pd.homeX, y1 = pd.homeY, x2 = sd.homeX, y2 = sd.homeY;
+          // soft walkway carpet
+          ctx.strokeStyle = 'rgba(150,150,165,0.10)';
+          ctx.lineWidth = 12; ctx.lineCap = 'round'; ctx.setLineDash([]);
+          ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+          // animated dashed centre line, tinted by the sub's state, flowing parent→child
+          ctx.globalAlpha = 0.5;
+          ctx.strokeStyle = STATE_COLORS[sub.agent.state] || '#8891a0';
+          ctx.lineWidth = 1.5; ctx.setLineDash([4, 5]); ctx.lineDashOffset = -(frameN * 0.5) % 9;
+          ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+          ctx.globalAlpha = 1; ctx.setLineDash([]);
+        }
+      }
+      ctx.restore();
+
       // draw root desks first (under), then subs
       const drawList = [];
       for (const root of tree.roots) {
