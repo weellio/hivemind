@@ -202,20 +202,31 @@
     ctx.fillText(lbl, x, y + 30 * scale);
   }
 
-  // Water cooler (top-down) — a break destination for idle agents.
-  function drawCooler(ctx, x, y, t) {
-    ctx.fillStyle = 'rgba(120,130,145,0.9)';
-    ctx.beginPath(); ctx.arc(x, y, 12, 0, Math.PI * 2); ctx.fill();           // base
-    ctx.fillStyle = 'rgba(56,189,248,0.9)';
-    ctx.beginPath(); ctx.arc(x, y, 7.5, 0, Math.PI * 2); ctx.fill();          // water bottle
-    ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    ctx.beginPath(); ctx.arc(x - 2.2, y - 2.2, 2.6, 0, Math.PI * 2); ctx.fill(); // highlight
-    const b = Math.floor(t / 18) % 3;                                          // rising bubbles
-    ctx.fillStyle = 'rgba(255,255,255,0.6)';
-    for (let i = 0; i <= b; i++) { ctx.beginPath(); ctx.arc(x + 9, y - 7 - i * 4, 1.4, 0, Math.PI * 2); ctx.fill(); }
+  // Water cooler drawn UPRIGHT (front view) — bottle on a dispenser, like the
+  // real thing. (x, y) is the bottom-centre of the base.
+  function drawCooler(ctx, x, y) {
+    const rr = (rx, ry, w, h, r) => { ctx.beginPath(); ctx.roundRect(rx, ry, w, h, r); ctx.fill(); };
+    const baseW = 26, baseH = 20, bx = x - baseW / 2, by = y - baseH;
+    // dispenser body
+    ctx.fillStyle = '#cfd3da'; rr(bx, by, baseW, baseH, 4);
+    ctx.fillStyle = '#e4e7ec'; rr(bx + 6, by, baseW - 12, baseH, 1);          // lighter centre panel
+    ctx.fillStyle = '#9aa3af'; rr(bx + 4, by + 5, baseW - 8, baseH - 8, 3);   // recessed panel
+    // taps (hot red / cold blue)
+    ctx.fillStyle = '#ef4444'; rr(x - 6.2, by + 6, 2.4, 4, 1);
+    ctx.fillStyle = '#f87171'; rr(x - 8, by + 9.5, 6, 4, 1.5);
+    ctx.fillStyle = '#38bdf8'; rr(x + 3.8, by + 6, 2.4, 4, 1);
+    ctx.fillStyle = '#7dd3fc'; rr(x + 2, by + 9.5, 6, 4, 1.5);
+    // neck/cap
+    ctx.fillStyle = '#aab1bc'; rr(x - 5, by - 4, 10, 5, 2);
+    // bottle (upright, rounded top)
+    const botW = 18, botH = 22, btx = x - botW / 2, bty = by - 4 - botH;
+    ctx.fillStyle = '#9fe3fb'; rr(btx, bty, botW, botH, 7);
+    ctx.fillStyle = 'rgba(255,255,255,0.45)'; rr(btx + 3, bty + 3, 4, botH - 8, 2); // water sheen
+    ctx.fillStyle = 'rgba(56,189,248,0.35)'; rr(btx + botW - 6, bty + 4, 4, botH - 8, 2);
+    // label
     ctx.fillStyle = 'rgba(130,130,140,0.85)';
     ctx.font = '8px ui-sans-serif, system-ui, sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText('water', x, y + 22);
+    ctx.fillText('water', x, y + 9);
   }
 
   function drawBubble(ctx, x, y, scale) {
