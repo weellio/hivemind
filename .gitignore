@@ -14,3 +14,6 @@ samples/*.jsonl
 .DS_Store
 Thumbs.db
 *.log
+
+# Local Claude settings
+.claude/settings.local.json

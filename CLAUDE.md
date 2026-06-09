@@ -10,9 +10,19 @@ A real-time visual dashboard that displays Claude Code sub-agents as animated av
 
 ## Current State (read first)
 
-This repo is **greenfield**. Only `CLAUDE.md` and `memory.md` exist on disk — none of the `dashboard/` or `bridge/` source described below has been written yet. The architecture, file tree, and code samples in this document are the **target design / spec**, not existing code. Before implementing, read `memory.md` for the build order (Phase 1 dashboard → Phase 2 bridge → Phase 3 Claude Code wiring), locked-in decisions, and rationale. No build, lint, or test tooling exists yet; choose and document it when you scaffold Phase 1.
+Hivemind is **built and shipping** — a Svelte 5 dashboard (`web/`, built into `dashboard/dist/`), a zero‑dependency Node bridge (`bridge/`), Claude Code hooks (`hooks/`), and a `node --test` suite (`test/`). See **[README.md](README.md)** for what it does and how to install. The detailed file tree and code samples further down are from the **original design spec** and may not match the shipped code one‑to‑one — trust the actual files + the README.
 
-**Platform note:** Development happens on **Windows 10 / PowerShell**, not macOS. Use Windows paths and commands. The macOS reference in `memory.md` and the Unix dev commands below are stale — translate them (see Development Commands).
+**Working in this repo** (Windows/PowerShell shown; on macOS/Linux swap `start`→`open`/`xdg-open`):
+
+```powershell
+cd web; npm install; npm run build     # build the dashboard -> dashboard/dist/ (what the bridge serves)
+cd web; npm run dev                     # hot-reload dev server
+node bridge/server.js --port 3131       # the zero-dep bridge on :3131
+node --test                             # run the test suite (zero deps)
+node install.js                         # merge the global Claude Code hooks (or: --project)
+```
+
+After editing anything in `web/src/`, run `npm run build` in `web/` so the served `dashboard/dist/` is current.
 
 ## Architecture
 
