@@ -82,7 +82,7 @@
           </section>
         {/each}
       </div>
-      <div class="foot">Tip: panels open from <b>⚙ Manage ▾</b>; everything runs locally via the bridge on :3131. Press <kbd>Esc</kbd> to close.</div>
+      <div class="foot">Tip: press <kbd>⌘/Ctrl-K</kbd> for the command palette — jump to any panel or fly to any agent by name. Panels also open from <b>⚙ Manage ▾</b>; everything runs locally via the bridge on :3131.</div>
     </div>
   </div>
 {/if}
