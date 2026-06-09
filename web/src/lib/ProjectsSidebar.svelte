@@ -12,7 +12,10 @@
   let costMap = $state({});
   let timer = null;
 
-  async function load() { try { const r = await fetch('/api/projects'); data = await r.json(); loadGit(); loadCost(); } catch (_) {} }
+  // lightweight poll: just the project list + running badges (NOT git/cost — those are heavy)
+  async function load() { try { const r = await fetch('/api/projects'); data = await r.json(); } catch (_) {} }
+  // full refresh: list + git status + per-project cost. Run on open + after actions, never on the poll.
+  async function loadAll() { await load(); loadGit(); loadCost(); }
   async function loadCost() { try { const r = await fetch('/api/usage'); const j = await r.json(); const m = {}; for (const p of (j.byProject || [])) m[String(p.path).toLowerCase()] = p.costUSD; costMap = m; } catch (_) {} }
 
   // reverse lookup: "which project has this skill/agent/hook/mcp?"
@@ -43,12 +46,12 @@
       gitMap = await r.json();
     } catch (_) {}
   }
-  function openPanel() { open = true; result = ''; load(); timer = setInterval(load, 3000); }
+  function openPanel() { open = true; result = ''; loadAll(); timer = setInterval(load, 5000); }
   function closePanel() { open = false; clearInterval(timer); }
   async function post(path, body) { try { return await (await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json(); } catch (_) { return null; } }
-  async function addRoot() { const p = newRoot.trim(); if (!p) return; await post('/api/projects/roots', { path: p }); newRoot = ''; load(); }
+  async function addRoot() { const p = newRoot.trim(); if (!p) return; await post('/api/projects/roots', { path: p }); newRoot = ''; loadAll(); }
   async function removeRoot(p) { await post('/api/projects/roots', { action: 'remove', path: p }); load(); }
-  async function browse() { result = 'Opening folder picker…'; const j = await post('/api/pick-folder', {}); result = j && j.ok ? `Added ${j.path}` : (j && j.error ? j.error : ''); load(); }
+  async function browse() { result = 'Opening folder picker…'; const j = await post('/api/pick-folder', {}); result = j && j.ok ? `Added ${j.path}` : (j && j.error ? j.error : ''); loadAll(); }
   let mutedSet = $derived(new Set(data.muted || []));
   async function toggleMute(p) { const m = !mutedSet.has(p.name); await post('/api/mute', { project: p.name, muted: m }); load(); }
   function pick(proj, type, name) { selected = { fromPath: proj.path, fromName: proj.name, type, name }; target = ''; result = ''; pendingDiff = null; }
