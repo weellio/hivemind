@@ -377,12 +377,44 @@ function copySkill(fromCwd, toCwd, skill) {
 }
 
 // Open a path in the OS file manager or in VS Code (local bridge → real action).
+// Spawn a detached process, swallowing the async 'error' event so a missing
+// binary can't crash the bridge.
+function spawnSafe(cmd, args, opts, onError) {
+  try {
+    const c = spawn(cmd, args, Object.assign({ detached: true, stdio: 'ignore' }, opts || {}));
+    c.on('error', (e) => { if (onError) onError(e); });
+    c.unref();
+    return c;
+  } catch (e) { if (onError) onError(e); return null; }
+}
+
+// Locate VS Code's executable (PATH `code` is often unavailable to a hook-spawned bridge).
+function findVSCode() {
+  const env = process.env;
+  const cands = process.platform === 'win32' ? [
+    path.join(env.LOCALAPPDATA || '', 'Programs', 'Microsoft VS Code', 'Code.exe'),
+    'C:\\Program Files\\Microsoft VS Code\\Code.exe',
+    'C:\\Program Files (x86)\\Microsoft VS Code\\Code.exe',
+    path.join(env.ProgramFiles || '', 'Microsoft VS Code', 'Code.exe'),
+  ] : [];
+  for (const c of cands) { try { if (c && fs.existsSync(c)) return c; } catch (_) {} }
+  return null;
+}
+
 function openPath(p, target) {
   try {
-    if (target === 'editor') { spawn('code', [p], { shell: true, detached: true, stdio: 'ignore' }).unref(); return; }
-    if (process.platform === 'win32') spawn('explorer', [p], { detached: true, stdio: 'ignore' }).unref();
-    else if (process.platform === 'darwin') spawn('open', [p], { detached: true, stdio: 'ignore' }).unref();
-    else spawn('xdg-open', [p], { detached: true, stdio: 'ignore' }).unref();
+    const win = process.platform === 'win32';
+    const norm = win ? path.normalize(p) : p;
+    if (target === 'editor') {
+      const exe = findVSCode();
+      if (exe) { spawnSafe(exe, [norm]); return; }
+      // last resort: `code` on PATH (via shell), falling back to the folder
+      spawnSafe(win ? 'code.cmd' : 'code', [norm], { shell: true }, () => { if (win) spawnSafe('explorer.exe', [norm]); });
+      return;
+    }
+    if (win) spawnSafe('explorer.exe', [norm]);
+    else if (process.platform === 'darwin') spawnSafe('open', [norm]);
+    else spawnSafe('xdg-open', [norm]);
   } catch (_) {}
 }
 
