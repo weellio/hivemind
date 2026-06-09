@@ -53,6 +53,7 @@
     try { await fetch('/api/open', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cwd: agent.cwd, target }) }); } catch (_) {}
   }
   function onKey(e) { if (e.key === 'Escape') onClose(); }
+  function rel(ts) { if (!ts) return ''; const s = Math.max(0, Math.floor((Date.now() - ts) / 1000)); if (s < 60) return s + 's'; const m = Math.floor(s / 60); if (m < 60) return m + 'm'; const h = Math.floor(m / 60); if (h < 24) return h + 'h'; return Math.floor(h / 24) + 'd'; }
 </script>
 
 <svelte:window onkeydown={onKey} />
@@ -71,6 +72,7 @@
         {#if agent.sessionId}<span class="mono">· {String(agent.sessionId).slice(0, 8)}</span>{/if}
         {#if agent.parentId}<span>· sub-agent</span>{/if}
         {#if agent.role}<span title="Agent type">· {agent.role}</span>{/if}
+        {#if agent.updatedAt}<span class="mono" title="Time since last event">· ⏱ {rel(agent.updatedAt)}</span>{/if}
         {#if cost}<span class="mono" title="This session's estimated spend">· 💰 ${cost.costUSD.toFixed(2)}</span>{/if}
       </div>
       {#if agent.cwd}<div class="path mono">{agent.cwd}</div>{/if}

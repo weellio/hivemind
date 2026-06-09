@@ -169,6 +169,7 @@
   });
   let sessionCount = $derived(new Set(shown.map((a) => a.sessionId).filter(Boolean)).size);
   let errorCount = $derived(shown.filter((a) => a.state === 'error').length);
+  let latest = $derived.by(() => { let b = null; for (const a of shown) if (!b || (a.updatedAt || 0) > (b.updatedAt || 0)) b = a; return b; });
 
   function pickProject(e) {
     selectedProject = e.target.value;
@@ -323,6 +324,16 @@
     {/each}
   </div>
 
+  {#if latest && shown.length}
+    <div class="ticker" title="Most recent activity">
+      <span class="tdot" style="background:{STATE_COLORS[latest.state] || '#888'}"></span>
+      <b>{latest.name}</b>
+      <span class="tstate">{STATE_LABEL[latest.state] || latest.state}</span>
+      {#if latest.logLines?.[0]}<span class="tlog">{latest.logLines[0]}</span>{/if}
+      {#if latest.project}<span class="tproj">· {latest.project}</span>{/if}
+    </div>
+  {/if}
+
   {#if shown.length === 0}
     <div class="empty">No agents reporting yet. Run <code>/hooks</code> in a Claude Code session (or start a new one) to begin.</div>
   {:else if $layout === 'office'}
@@ -375,6 +386,14 @@
   @keyframes errpulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
   .cnt i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
   .empty { padding: 40px; text-align: center; color: var(--color-text-tertiary); font-size: 13px; }
+  .ticker { display: flex; align-items: center; gap: 7px; padding: 5px 14px; margin-top: -6px; font-size: 11px;
+    color: var(--color-text-secondary); background: var(--color-background-secondary);
+    border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); overflow: hidden; white-space: nowrap; }
+  .ticker b { color: var(--color-text-primary); flex-shrink: 0; }
+  .tdot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .tstate { color: var(--color-text-tertiary); flex-shrink: 0; }
+  .tlog { font-family: var(--font-mono); font-size: 10px; overflow: hidden; text-overflow: ellipsis; }
+  .tproj { color: var(--color-text-tertiary); flex-shrink: 0; }
   .office-wrap { position: relative; height: calc(100vh - 175px); min-height: 440px; border: 0.5px solid var(--color-border-tertiary);
     border-radius: var(--border-radius-lg); overflow: auto; background: var(--color-background-primary); }
   code { font-family: var(--font-mono); background: var(--color-background-primary); padding: 1px 5px; border-radius: 4px; }

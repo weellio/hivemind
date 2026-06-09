@@ -440,6 +440,12 @@
     try {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // ambient office lighting by local time of day (subtle, under everything)
+      const hr = new Date().getHours();
+      const amb = (hr >= 22 || hr < 6) ? 'rgba(18,24,48,0.20)'
+        : hr >= 19 ? 'rgba(255,150,70,0.05)'
+        : hr < 8 ? 'rgba(150,180,255,0.05)' : null;
+      if (amb) { ctx.fillStyle = amb; ctx.fillRect(0, 0, canvas.width, canvas.height); }
       ctx.setTransform(dpr * zoom, 0, 0, dpr * zoom, panX * dpr, panY * dpr);
       hitTargets = [];
 
