@@ -157,9 +157,8 @@ States: `idle · thinking · coding · spawning · reading · testing · error �
 
 - **Port** — `AOC_PORT` (default `3131`).
 - **Telegram alerts/replies** — `{ "telegramToken": "...", "telegramChatId": "...", "dashboardUrl": "..." }` (or `AOC_TG_TOKEN` / `AOC_TG_CHAT` / `AOC_DASH_URL`). For inbound replies, the bot must have no webhook — use a dedicated bot via `"telegramReplyToken"` if needed.
-- **License** — `{ "license": "...", "gumroadProduct": "..." }` (or `AOC_LICENSE`). Licensing is off unless a Gumroad product is configured.
 - **Avatar images** — imported from the dashboard (**Images…** / **Action images…**), stored in the browser's localStorage.
 
 ## License
 
-MIT
+**MIT** — free and open source. Use it, fork it, ship it. Issues and PRs welcome.

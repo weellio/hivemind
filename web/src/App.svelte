@@ -40,7 +40,6 @@
   let online = $state(false);
   let selectedProject = $state(localStorage.getItem('aoc-project') || '');
   let fileInput = $state();
-  let license = $state({ licensed: true });
 
   // chime when an agent newly needs input / errors
   let prevAwaiting = new Set();
@@ -169,7 +168,6 @@
   onMount(() => {
     poll();
     pollUsage();
-    fetch('/api/license').then((r) => r.json()).then((s) => (license = s)).catch(() => {});
     fetch('/api/health').then((r) => r.json()).then((s) => (healthInfo = s)).catch(() => {});
     // auto-refresh cost only when enabled (re-parsing transcripts is disk-heavy)
     const uid = setInterval(() => { if ($autoUsage) pollUsage(); }, 60000);
@@ -232,11 +230,6 @@
 <CommandPalette bind:open={paletteOpen} items={paletteItems} />
 
 <div class="dashboard">
-  {#if license.licensed === false}
-    <div class="lic">⚠ Hivemind is unlicensed — {license.message || 'add your license key to bridge/aoc-config.json'}.
-      <button onclick={() => (license = { licensed: true })}>Dismiss</button>
-    </div>
-  {/if}
   {#if budget?.overDaily && !budgetDismissed}
     <div class="lic">💸 Daily spend ${budget.dailyCost.toFixed(2)} crossed your ${budget.daily} cap.
       <button onclick={() => (budgetDismissed = true)}>Dismiss</button>
