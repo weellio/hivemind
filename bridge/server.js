@@ -408,7 +408,8 @@ function openPath(p, target) {
     if (target === 'editor') {
       const exe = findVSCode();
       if (exe) { spawnSafe(exe, [norm]); return; }
-      // last resort: `code` on PATH (via shell), falling back to the folder
+      if (process.platform === 'darwin') { spawnSafe('open', ['-a', 'Visual Studio Code', norm], {}, () => spawnSafe('code', [norm], { shell: true })); return; }
+      // Windows/Linux: `code` on PATH (via shell), falling back to the folder on Windows
       spawnSafe(win ? 'code.cmd' : 'code', [norm], { shell: true }, () => { if (win) spawnSafe('explorer.exe', [norm]); });
       return;
     }
