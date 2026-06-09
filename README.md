@@ -11,6 +11,8 @@ It attaches to any project automatically via Claude Code **hooks** — no manual
 <p align="center"><img src="docs/demo.webp" alt="Hivemind in action" width="820" /></p>
 <p align="center"><em>idle · thinking · coding · spawning · reading · testing · error · done — every agent, live.</em></p>
 
+<p align="center"><a href="https://www.paypal.com/ncp/payment/G8NNLNUHD6SFW"><img src="https://img.shields.io/badge/%E2%98%95_Buy_me_a_coffee-PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white" alt="Buy me a coffee" /></a></p>
+
 ## What you get
 
 - **Live agent tiles** — one per session/sub-agent, driven by real tool activity.
@@ -189,6 +191,10 @@ States: `idle · thinking · coding · spawning · reading · testing · error �
 - **Port** — `AOC_PORT` (default `3131`).
 - **Telegram alerts/replies** — `{ "telegramToken": "...", "telegramChatId": "...", "dashboardUrl": "..." }` (or `AOC_TG_TOKEN` / `AOC_TG_CHAT` / `AOC_DASH_URL`). For inbound replies, the bot must have no webhook — use a dedicated bot via `"telegramReplyToken"` if needed.
 - **Avatar images** — imported from the dashboard (**Images…** / **Action images…**), stored in the browser's localStorage.
+
+## Support
+
+Hivemind is free and always will be. If it saves you time (or money), you can [**buy me a coffee** ☕](https://www.paypal.com/ncp/payment/G8NNLNUHD6SFW) — and a ⭐ on the repo genuinely helps.
 
 ## License
 
