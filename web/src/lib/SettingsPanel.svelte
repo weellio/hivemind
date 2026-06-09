@@ -27,7 +27,7 @@
     loading = false;
   }
 
-  function openPanel() { open = true; cfg = null; cwd = ''; rawOpen = false; status = ''; loadProjects(); loadTg(); loadBudget(); loadEditor(); }
+  function openPanel() { open = true; cfg = null; cwd = ''; rawOpen = false; status = ''; loadProjects(); loadTg(); loadBudget(); loadEditor(); loadNudge(); }
 
   // ── cost budget (global) ──
   let bud = $state(null); let budDaily = $state(''); let budSession = $state(''); let budStatus = $state(''); let budOpen = $state(false);
@@ -38,6 +38,11 @@
   let edOpen = $state(false); let edCmd = $state(''); let edStatus = $state('');
   async function loadEditor() { try { const r = await fetch('/api/editor'); const j = await r.json(); edCmd = (j && j.cmd) || ''; } catch (_) {} }
   async function saveEditor() { edStatus = 'Saving…'; const r = await post('/api/editor', { cmd: edCmd }); edStatus = r && r.ok ? '✓ Saved' : 'Error'; }
+
+  // ── wake-on-send (fire the nudge scheduled task when a message is sent) ──
+  let nzOpen = $state(false); let nzOn = $state(false); let nzTask = $state('Hivemind Nudge'); let nzStatus = $state('');
+  async function loadNudge() { try { const r = await fetch('/api/nudge-config'); const j = await r.json(); nzOn = !!j.onSend; nzTask = j.taskName || 'Hivemind Nudge'; } catch (_) {} }
+  async function saveNudge() { nzStatus = 'Saving…'; const r = await post('/api/nudge-config', { onSend: nzOn, taskName: nzTask }); nzStatus = r && r.ok ? '✓ Saved' : 'Error'; }
 
   function closePanel() { open = false; }
 
@@ -166,6 +171,22 @@
           <div class="tg-btns"><button class="select" onclick={saveEditor}>Save</button></div>
           {#if edStatus}<div class="tg-status">{edStatus}</div>{/if}
           <div class="tg-hint">Set this only if “Open in VS Code” fails — a full path (e.g. C:\Users\you\AppData\Local\Programs\Microsoft VS Code\bin\code.cmd) or another editor command like codium / subl. Receives the file/folder as its argument.</div>
+        </div>
+      {/if}
+    </div>
+
+    <div class="tg">
+      <button class="collapser" onclick={() => (nzOpen = !nzOpen)}>
+        <span class="caret">{nzOpen ? '▾' : '▸'}</span> Wake on send
+        {#if nzOn}<span class="tg-state">· on</span>{/if}
+      </button>
+      {#if nzOpen}
+        <div class="tg-form">
+          <label class="cbrow"><input type="checkbox" bind:checked={nzOn} /> Run the nudge task when I send a message</label>
+          <input class="in" placeholder="scheduled task name" bind:value={nzTask} />
+          <div class="tg-btns"><button class="select" onclick={saveNudge}>Save</button></div>
+          {#if nzStatus}<div class="tg-status">{nzStatus}</div>{/if}
+          <div class="tg-hint">Runs schtasks /Run /TN "&lt;name&gt;" after a reply so a parked/idle session wakes immediately (instead of waiting for the timer). Needs the scheduled task set up — see scripts/nudge-idle.ps1. Windows only.</div>
         </div>
       {/if}
     </div>
@@ -314,4 +335,5 @@
   .tg-btns { display: flex; gap: 6px; }
   .tg-status { font-size: 11px; color: var(--color-text-secondary); }
   .tg-hint { font-size: 10px; color: var(--color-text-tertiary); line-height: 1.4; }
+  .cbrow { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--color-text-secondary); cursor: pointer; }
 </style>

@@ -148,6 +148,14 @@ const tg = {
 };
 function saveConfig() { try { fs.writeFileSync(CFG_FILE, JSON.stringify(cfg, null, 2)); } catch (_) {} }
 
+// Optionally kick the (hidden) "Hivemind Nudge" scheduled task right after a reply is queued,
+// so a parked/idle session is woken immediately instead of waiting for the timer.
+function maybeNudge() {
+  if (process.platform === 'win32' && cfg.nudgeOnSend) {
+    spawnSafe('schtasks', ['/Run', '/TN', cfg.nudgeTaskName || 'Hivemind Nudge'], { windowsHide: true });
+  }
+}
+
 // ── auto-retire ("clock out") — prune stale tiles so the floor reflects reality.
 // Only idle/done ever retire; active states never do. Tunable via aoc-config.json.
 const RETIRE = {
@@ -264,6 +272,7 @@ function handleTgMessage(m) {
   if (!sessionId) sessionId = lastAwaitingSession || lastActiveSession;
   if (!sessionId) { sendTelegram('No active session to send to. Use “project: your message”.'); return; }
   queueCommand(sessionId, type, payload);
+  maybeNudge();
   const root = agents.get('sess:' + sessionId);
   sendTelegram(`→ ${type === 'stop' ? 'STOP' : 'message'} queued for <b>${root ? root.project : sessionId}</b>`);
 }
@@ -748,6 +757,7 @@ const server = http.createServer(async (req, res) => {
       console.log(`[command] ${body.sessionId} <- ${body.type || 'message'}: ${String(body.text || '').slice(0, 60)}`);
       const k = 'sess:' + body.sessionId;                 // you replied → cancel the pending Telegram nudge
       if (awaitTimers.has(k)) { clearTimeout(awaitTimers.get(k)); awaitTimers.delete(k); }
+      maybeNudge();                                        // wake a parked session right away
     }
     return sendJson(res, r.error ? 400 : 200, r);
   }
@@ -869,6 +879,19 @@ const server = http.createServer(async (req, res) => {
     cfg.editorCmd = body && body.cmd ? String(body.cmd).trim() : '';
     saveConfig();
     return sendJson(res, 200, { ok: true, cmd: cfg.editorCmd });
+  }
+
+  if (url === '/api/nudge-config' && req.method === 'GET') {
+    return sendJson(res, 200, { onSend: !!cfg.nudgeOnSend, taskName: cfg.nudgeTaskName || 'Hivemind Nudge' });
+  }
+  if (url === '/api/nudge-config' && req.method === 'POST') {
+    const body = await readBody(req);
+    if (body) {
+      if (body.onSend !== undefined) cfg.nudgeOnSend = !!body.onSend;
+      if (body.taskName !== undefined) cfg.nudgeTaskName = String(body.taskName).trim() || 'Hivemind Nudge';
+      saveConfig();
+    }
+    return sendJson(res, 200, { ok: true, onSend: !!cfg.nudgeOnSend, taskName: cfg.nudgeTaskName || 'Hivemind Nudge' });
   }
 
   if (url === '/api/telegram-config' && req.method === 'GET') {
