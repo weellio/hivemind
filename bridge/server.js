@@ -727,7 +727,7 @@ const server = http.createServer(async (req, res) => {
       if (byPath.has(rp)) byPath.get(rp).running = true;
       else { const pr = projects.project(a.cwd); pr.running = true; pr.sources = ['session']; byPath.set(rp, pr); list.push(pr); }
     }
-    return sendJson(res, 200, { roots: projects.getConfig().roots, projects: list });
+    return sendJson(res, 200, { roots: projects.getConfig().roots, projects: list, muted: [...muted] });
   }
 
   if (url === '/api/projects/roots' && req.method === 'POST') {

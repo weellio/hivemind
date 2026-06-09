@@ -25,6 +25,8 @@
   async function addRoot() { const p = newRoot.trim(); if (!p) return; await post('/api/projects/roots', { path: p }); newRoot = ''; load(); }
   async function removeRoot(p) { await post('/api/projects/roots', { action: 'remove', path: p }); load(); }
   async function browse() { result = 'Opening folder picker…'; const j = await post('/api/pick-folder', {}); result = j && j.ok ? `Added ${j.path}` : (j && j.error ? j.error : ''); load(); }
+  let mutedSet = $derived(new Set(data.muted || []));
+  async function toggleMute(p) { const m = !mutedSet.has(p.name); await post('/api/mute', { project: p.name, muted: m }); load(); }
   function pick(proj, type, name) { selected = { fromPath: proj.path, fromName: proj.name, type, name }; target = ''; result = ''; pendingDiff = null; }
 
   let busy = $state('');
@@ -117,7 +119,8 @@
 
     <div class="list">
       {#each data.projects as p (p.path)}
-        <div class="proj">
+        <div class="proj" class:muted={mutedSet.has(p.name)}>
+          <div class="phead">
           <button class="prow" onclick={() => (expanded = { ...expanded, [p.path]: !expanded[p.path] })}>
             <span class="caret">{expanded[p.path] ? '▾' : '▸'}</span>
             <span class="pname" title={p.path}>{p.name}</span>
@@ -129,6 +132,8 @@
             {/if}
             <span class="counts">{p.skills.length}·{p.agents.length}·{p.commands.length}·{p.hooks.length}</span>
           </button>
+          <button class="mute" onclick={() => toggleMute(p)} title={mutedSet.has(p.name) ? 'Unmute — show on the floor' : 'Mute — hide from the floor'}>{mutedSet.has(p.name) ? '🔇' : '🔊'}</button>
+          </div>
           {#if expanded[p.path]}
             <div class="comps">
               <div class="acts">
@@ -218,7 +223,10 @@
   .addrow input { flex: 1 1 auto; min-width: 0; font-size: 11px; padding: 5px 7px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-tertiary); background: var(--color-background-secondary); color: var(--color-text-primary); }
   .list { flex: 1 1 auto; overflow: auto; padding: 6px 8px; }
   .proj { border-bottom: 0.5px solid var(--color-border-tertiary); }
-  .prow { display: flex; align-items: center; gap: 7px; width: 100%; background: none; border: none; cursor: pointer; padding: 7px 6px; text-align: left; color: var(--color-text-primary); }
+  .phead { display: flex; align-items: center; }
+  .proj.muted { opacity: 0.5; }
+  .mute { background: none; border: none; cursor: pointer; font-size: 12px; padding: 4px 8px; flex-shrink: 0; filter: grayscale(0.3); }
+  .prow { display: flex; align-items: center; gap: 7px; flex: 1 1 auto; min-width: 0; background: none; border: none; cursor: pointer; padding: 7px 6px; text-align: left; color: var(--color-text-primary); }
   .caret { color: var(--color-text-tertiary); font-size: 10px; width: 10px; }
   .pname { flex: 1 1 auto; font-size: 12px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .run { font-size: 9px; color: #10B981; }
