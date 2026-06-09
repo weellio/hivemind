@@ -20,14 +20,20 @@
   let isCanvas = $derived($avatarMode === 'pixel' || $avatarMode === 'abstract' || $avatarMode === 'desk');
   let color = $derived(STATE_COLORS[agent.state] || '#6B7280');
 
+  // Bundled default "action images" — the initial template for Your-image mode.
+  // Drop one PNG per state into web/public/actions/<state>.png; users override via Action images….
+  const DEFAULT_ACTION_STATES = new Set(['idle', 'thinking', 'coding', 'spawning', 'reading', 'testing', 'error', 'done']);
+  function defaultAction(state) { return DEFAULT_ACTION_STATES.has(state) ? `/actions/${state}.png` : null; }
+  function onImgErr(e) { const ph = placeholder(agent); if (!String(e.target.src).startsWith('data:')) e.target.src = ph; }
+
   // Stable per-agent key (name/project persist across sessions; id is the fallback).
   let key = $derived(agent.name || agent.project || String(agent.id));
-  // Resolution: agent+state > agent base > global state > imported pool > placeholder.
+  // Resolution: agent+state > agent base > global state > imported pool > bundled default > placeholder.
   let imgSrc = $derived(
     $imageMap[`${key}::${agent.state}`] ||
     $imageMap[key] ||
     $imageMap[`*::${agent.state}`] ||
-    ($images.length ? $images[hash(agent.id) % $images.length] : placeholder(agent))
+    ($images.length ? $images[hash(agent.id) % $images.length] : (defaultAction(agent.state) || placeholder(agent)))
   );
 
   let fileInput = $state(null);
@@ -82,7 +88,7 @@
        role="button" tabindex="0"
        title="Click: set this agent's image · Shift-click: set for this state · Alt-click: reset"
        onclick={pickImage} onkeydown={(e) => e.key === 'Enter' && pickImage(e)}>
-    <img class="img" src={imgSrc} alt="" />
+    <img class="img" src={imgSrc} alt="" onerror={onImgErr} />
     <div class="edit">✎</div>
     <input bind:this={fileInput} type="file" accept="image/*" style="display:none"
            onclick={(e) => e.stopPropagation()} onchange={onPick} />
