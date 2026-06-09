@@ -175,4 +175,38 @@ function diffComponent(type, name, fromDir, toDir) {
   return { exists: true, kind: type, ...capLines(lineDiff(a, b)) };
 }
 
-module.exports = { getConfig, addRoot, removeRoot, noteKnown, discover, project, copyComponent, keyOf, diffComponent };
+// ── read / edit a component's underlying file(s) ──
+function readComponent(type, name, dir) {
+  if (!type || !name || /[\\/]/.test(name) || name.includes('..')) return { error: 'invalid' };
+  if (type === 'hook' || type === 'mcp') {
+    try {
+      const fp = type === 'hook' ? path.join(dir, '.claude', 'settings.json') : path.join(dir, '.mcp.json');
+      const obj = JSON.parse(fs.readFileSync(fp, 'utf8'));
+      const v = type === 'hook' ? (obj.hooks && obj.hooks[name]) : (obj.mcpServers && obj.mcpServers[name]);
+      if (v === undefined) return { error: 'not found' };
+      return { ok: true, type, name, path: fp, lang: 'json', readonly: true, content: JSON.stringify(v, null, 2) };
+    } catch (e) { return { error: e.message }; }
+  }
+  if (type === 'skill') {
+    const folder = path.join(dir, '.claude', 'skills', name);
+    let files = [];
+    try { files = fs.readdirSync(folder).filter((f) => { try { return fs.statSync(path.join(folder, f)).isFile(); } catch (_) { return false; } }); } catch (_) { return { error: 'not found' }; }
+    let f = path.join(folder, 'SKILL.md');
+    if (!fs.existsSync(f)) { const md = files.find((x) => /\.md$/i.test(x)); if (md) f = path.join(folder, md); else return { error: 'no readable file' }; }
+    try { return { ok: true, type, name, path: f, lang: 'markdown', readonly: false, content: fs.readFileSync(f, 'utf8'), files }; } catch (e) { return { error: e.message }; }
+  }
+  const rel = type === 'agent' ? ['agents', name + '.md'] : type === 'command' ? ['commands', name + '.md'] : null;
+  if (!rel) return { error: 'unknown type' };
+  const fp = path.join(dir, '.claude', ...rel);
+  try { return { ok: true, type, name, path: fp, lang: 'markdown', readonly: false, content: fs.readFileSync(fp, 'utf8') }; } catch (e) { return { error: 'not found' }; }
+}
+
+function writeComponent(dir, filePath, content) {
+  const root = path.resolve(path.join(dir, '.claude'));
+  let fp; try { fp = path.resolve(filePath || ''); } catch (_) { return { error: 'bad path' }; }
+  if (!(fp === root || fp.startsWith(root + path.sep))) return { error: 'path outside project .claude' };
+  if (!/\.(md|txt)$/i.test(fp)) return { error: 'only .md/.txt are editable here' };
+  try { fs.writeFileSync(fp, String(content == null ? '' : content)); return { ok: true, path: fp }; } catch (e) { return { error: e.message }; }
+}
+
+module.exports = { getConfig, addRoot, removeRoot, noteKnown, discover, project, copyComponent, keyOf, diffComponent, readComponent, writeComponent };

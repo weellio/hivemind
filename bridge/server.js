@@ -888,6 +888,21 @@ const server = http.createServer(async (req, res) => {
     return sendJson(res, 200, projects.diffComponent(body.type, body.name, body.fromCwd, body.toCwd));
   }
 
+  if (url === '/api/component-read' && req.method === 'POST') {
+    const body = await readBody(req);
+    if (!body || !body.cwd) return sendJson(res, 400, { error: 'cwd required' });
+    const r = projects.readComponent(body.type, body.name, body.cwd);
+    return sendJson(res, r.error ? 400 : 200, r);
+  }
+
+  if (url === '/api/component-write' && req.method === 'POST') {
+    const body = await readBody(req);
+    if (!body || !body.cwd || !body.path) return sendJson(res, 400, { error: 'cwd and path required' });
+    const r = projects.writeComponent(body.cwd, body.path, body.content);
+    if (!r.error) console.log(`[edit] ${body.path}`);
+    return sendJson(res, r.error ? 400 : 200, r);
+  }
+
   if (url === '/api/copy-component' && req.method === 'POST') {
     const body = await readBody(req);
     if (!body) return sendJson(res, 400, { error: 'invalid JSON' });

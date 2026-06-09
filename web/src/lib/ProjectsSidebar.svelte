@@ -53,6 +53,24 @@
   async function toggleMute(p) { const m = !mutedSet.has(p.name); await post('/api/mute', { project: p.name, muted: m }); load(); }
   function pick(proj, type, name) { selected = { fromPath: proj.path, fromName: proj.name, type, name }; target = ''; result = ''; pendingDiff = null; }
 
+  // view / edit a component's underlying file
+  let viewer = $state(null);
+  async function openViewer() {
+    if (!selected) return;
+    viewer = { loading: true };
+    const r = await post('/api/component-read', { type: selected.type, name: selected.name, cwd: selected.fromPath });
+    if (r && r.ok) viewer = { ...r, fromName: selected.fromName, fromPath: selected.fromPath, editing: false, status: '' };
+    else viewer = { error: (r && r.error) || 'could not read file', type: selected.type, name: selected.name };
+  }
+  async function saveViewer() {
+    if (!viewer || viewer.readonly) return;
+    viewer.status = 'Saving…';
+    const r = await post('/api/component-write', { cwd: viewer.fromPath, path: viewer.path, content: viewer.content });
+    if (r && r.ok) { viewer.status = '✓ Saved'; viewer.editing = false; }
+    else viewer.status = 'Error: ' + ((r && r.error) || 'failed');
+  }
+  async function openViewerInEditor(t) { if (viewer && viewer.path) await post('/api/open', { cwd: viewer.path, target: t }); }
+
   let busy = $state('');
   let commitMsg = $state({});
   let startPrompt = $state({});
@@ -222,6 +240,7 @@
     {#if selected}
       <div class="copybar">
         <div class="sl">Copy <b>{selected.type}</b> “{selected.name}” from <b>{selected.fromName}</b></div>
+        <div class="row"><button class="select" onclick={openViewer}>👁 View / edit file</button></div>
         <div class="row">
           <select bind:value={target} class="select" onchange={() => (pendingDiff = null)}>
             <option value="">to project…</option>
@@ -243,6 +262,42 @@
           </div>
         {/if}
         {#if result}<div class="res">{result}</div>{/if}
+      </div>
+    {/if}
+
+    {#if viewer}
+      <div class="vov" onclick={() => (viewer = null)} role="presentation"></div>
+      <div class="vmodal" role="dialog" aria-label="Component file">
+        <div class="vhd">
+          <span class="frtype">{viewer.type}</span><b class="frname">{viewer.name}</b>
+          {#if viewer.fromName}<span class="vproj">· {viewer.fromName}</span>{/if}
+          <button class="x" onclick={() => (viewer = null)} aria-label="Close">✕</button>
+        </div>
+        {#if viewer.loading}
+          <div class="none" style="padding:14px">Loading…</div>
+        {:else if viewer.error}
+          <div class="none" style="padding:14px">{viewer.error}</div>
+        {:else}
+          <div class="vpath mono" title={viewer.path}>{viewer.path}</div>
+          {#if viewer.files && viewer.files.length > 1}<div class="vfiles">skill has {viewer.files.length} files: {viewer.files.join(', ')}</div>{/if}
+          {#if viewer.editing}
+            <textarea class="vedit mono" bind:value={viewer.content} spellcheck="false"></textarea>
+          {:else}
+            <pre class="vcontent">{viewer.content}</pre>
+          {/if}
+          <div class="vfoot">
+            {#if viewer.readonly}
+              <span class="dim">Read-only — edit hooks/MCP via the Config panel.</span>
+            {:else if viewer.editing}
+              <button class="select" onclick={saveViewer}>Save</button>
+              <button class="select" onclick={() => (viewer.editing = false)}>Cancel</button>
+            {:else}
+              <button class="select" onclick={() => (viewer.editing = true)}>✎ Edit</button>
+            {/if}
+            <button class="select" onclick={() => openViewerInEditor('editor')}>Open in VS Code</button>
+            {#if viewer.status}<span class="dim">{viewer.status}</span>{/if}
+          </div>
+        {/if}
       </div>
     {/if}
   </aside>
@@ -318,4 +373,19 @@
   .dl.del { color: #EF4444; background: rgba(239, 68, 68, 0.08); }
   .dl.ctx { color: var(--color-text-tertiary); }
   .diffnote { font-size: 10px; color: var(--color-text-tertiary); }
+  .vov { position: fixed; inset: 0; z-index: 95; background: rgba(0, 0, 0, 0.4); }
+  .vmodal { position: fixed; z-index: 96; top: 8vh; left: 50%; transform: translateX(-50%); width: 660px; max-width: 92vw; max-height: 82vh;
+    background: var(--color-background-primary); border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-lg);
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.4); display: flex; flex-direction: column; overflow: hidden; }
+  .vhd { display: flex; align-items: center; gap: 7px; padding: 10px 14px; border-bottom: 0.5px solid var(--color-border-tertiary); }
+  .vproj { font-size: 11px; color: var(--color-text-tertiary); }
+  .vhd .x { margin-left: auto; background: none; border: none; cursor: pointer; font-size: 14px; color: var(--color-text-tertiary); }
+  .vpath { font-size: 10px; color: var(--color-text-tertiary); padding: 6px 14px; border-bottom: 0.5px solid var(--color-border-tertiary); word-break: break-all; }
+  .vfiles { font-size: 10px; color: var(--color-text-tertiary); padding: 5px 14px 0; }
+  .vcontent { flex: 1 1 auto; overflow: auto; margin: 0; padding: 12px 14px; font-family: var(--font-mono); font-size: 11px; line-height: 1.5;
+    white-space: pre-wrap; word-break: break-word; color: var(--color-text-primary); }
+  .vedit { flex: 1 1 auto; min-height: 320px; margin: 8px 12px; padding: 10px; font-size: 11px; line-height: 1.5; resize: none;
+    border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); background: var(--color-background-secondary); color: var(--color-text-primary); }
+  .vfoot { display: flex; align-items: center; gap: 6px; padding: 8px 14px; border-top: 0.5px solid var(--color-border-tertiary); }
+  .vfoot .dim { font-size: 11px; color: var(--color-text-tertiary); }
 </style>
