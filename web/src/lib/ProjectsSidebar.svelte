@@ -14,6 +14,28 @@
 
   async function load() { try { const r = await fetch('/api/projects'); data = await r.json(); loadGit(); loadCost(); } catch (_) {} }
   async function loadCost() { try { const r = await fetch('/api/usage'); const j = await r.json(); const m = {}; for (const p of (j.byProject || [])) m[String(p.path).toLowerCase()] = p.costUSD; costMap = m; } catch (_) {} }
+
+  // reverse lookup: "which project has this skill/agent/hook/mcp?"
+  let find = $state('');
+  let matches = $derived.by(() => {
+    const q = find.trim().toLowerCase();
+    if (!q) return [];
+    const TYPES = [['skill', 'skills'], ['agent', 'agents'], ['command', 'commands'], ['hook', 'hooks'], ['mcp', 'mcp']];
+    const groups = new Map();
+    for (const p of (data.projects || [])) {
+      for (const [type, arrKey] of TYPES) {
+        for (const name of (p[arrKey] || [])) {
+          if (String(name).toLowerCase().includes(q)) {
+            const key = type + ':' + name;
+            if (!groups.has(key)) groups.set(key, { key, type, name, projects: [] });
+            groups.get(key).projects.push(p);
+          }
+        }
+      }
+    }
+    return Array.from(groups.values()).sort((a, b) => a.name.localeCompare(b.name)).slice(0, 80);
+  });
+  function openProj(p) { expanded = { ...expanded, [p.path]: true }; find = ''; }
   async function loadGit() {
     try {
       const paths = data.projects.map((p) => p.path);
@@ -119,6 +141,24 @@
       </div>
     </div>
 
+    <div class="findbar">
+      <input class="findinput" placeholder="🔎 Find a skill / agent / hook / MCP across all projects…" bind:value={find} />
+      {#if find}<button class="fx" onclick={() => (find = '')} aria-label="Clear">✕</button>{/if}
+    </div>
+
+    {#if find.trim()}
+      <div class="list">
+        {#if matches.length === 0}<div class="none" style="padding:12px 14px">No component matches “{find}”.</div>{/if}
+        {#each matches as m (m.key)}
+          <div class="fr">
+            <div class="frhd"><span class="frtype">{m.type}</span><b class="frname">{m.name}</b><span class="frcount">{m.projects.length}×</span></div>
+            <div class="frprojects">
+              {#each m.projects as p (p.path)}<button class="chip" onclick={() => openProj(p)} title="Open {p.path}">{p.name}</button>{/each}
+            </div>
+          </div>
+        {/each}
+      </div>
+    {:else}
     <div class="list">
       {#each data.projects as p (p.path)}
         <div class="proj" class:muted={mutedSet.has(p.name)}>
@@ -177,6 +217,7 @@
         </div>
       {/each}
     </div>
+    {/if}
 
     {#if selected}
       <div class="copybar">
@@ -225,6 +266,16 @@
   .addrow { display: flex; gap: 6px; margin-top: 2px; }
   .addrow input { flex: 1 1 auto; min-width: 0; font-size: 11px; padding: 5px 7px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-tertiary); background: var(--color-background-secondary); color: var(--color-text-primary); }
   .list { flex: 1 1 auto; overflow: auto; padding: 6px 8px; }
+  .findbar { display: flex; align-items: center; gap: 6px; padding: 8px 14px; border-bottom: 0.5px solid var(--color-border-tertiary); }
+  .findinput { flex: 1 1 auto; min-width: 0; font-size: 11px; padding: 5px 8px; border-radius: var(--border-radius-md);
+    border: 0.5px solid var(--color-border-tertiary); background: var(--color-background-secondary); color: var(--color-text-primary); }
+  .findbar .fx { background: none; border: none; cursor: pointer; color: var(--color-text-tertiary); font-size: 12px; }
+  .fr { padding: 7px 12px; border-bottom: 0.5px solid var(--color-border-tertiary); display: flex; flex-direction: column; gap: 5px; }
+  .frhd { display: flex; align-items: center; gap: 7px; }
+  .frtype { font-size: 8px; text-transform: uppercase; letter-spacing: 0.05em; color: #fff; background: var(--accent, #6366F1); padding: 1px 6px; border-radius: 99px; flex-shrink: 0; }
+  .frname { font-size: 12px; color: var(--color-text-primary); flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .frcount { font-size: 9px; color: var(--color-text-tertiary); font-family: var(--font-mono); flex-shrink: 0; }
+  .frprojects { display: flex; flex-wrap: wrap; gap: 4px; padding-left: 2px; }
   .proj { border-bottom: 0.5px solid var(--color-border-tertiary); }
   .phead { display: flex; align-items: center; }
   .proj.muted { opacity: 0.5; }
