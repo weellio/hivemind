@@ -157,7 +157,7 @@
   .ov {
     position: fixed;
     inset: 0;
-    z-index: 90;
+    z-index: 128; /* above the agent modal (100) it can be opened from */
     background: rgba(0, 0, 0, 0.25);
   }
 
@@ -166,7 +166,7 @@
     top: 0;
     right: 0;
     bottom: 0;
-    z-index: 91;
+    z-index: 129;
     width: 520px;
     max-width: 96vw;
     background: var(--color-background-primary);
