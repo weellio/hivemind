@@ -8,6 +8,7 @@
   let info = $state(null);
   let msg = $state('');
   let cost = $state(null);
+  let gh = $state(null);
   let txId = $state(null);
   let sid = $derived(agent ? (agent.sessionId || String(agent.id).replace(/^sess:/, '')) : '');
 
@@ -31,8 +32,16 @@
     if (!sid) return;
     try { const r = await fetch('/api/usage'); const j = await r.json(); cost = (j.bySession && j.bySession[sid]) || null; } catch (_) {}
   }
+  async function loadGithub() {
+    if (!agent || !agent.cwd) return;
+    try {
+      const r = await fetch('/api/github', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cwd: agent.cwd, kind: 'info' }) });
+      const j = await r.json();
+      gh = j && !j.error && j.url ? j : null;
+    } catch (_) {}
+  }
   onMount(() => {
-    refresh().then(() => { loadInfo(); loadCost(); });
+    refresh().then(() => { loadInfo(); loadCost(); loadGithub(); });
     const t = setInterval(refresh, 1200);
     return () => clearInterval(t);
   });
@@ -65,6 +74,7 @@
         <span class="dot"></span>
         <span class="name" title={agent.name}>{agent.name}</span>
         <span class="badge">{STATE_LABEL[agent.state] || agent.state}</span>
+        {#if gh?.url}<a class="ghlink" href={gh.url} target="_blank" rel="noopener" title={'Open ' + gh.repo + ' on GitHub'}>GitHub ↗</a>{/if}
         <button class="x" onclick={onClose} aria-label="Close">✕</button>
       </div>
       <div class="meta">
@@ -136,6 +146,9 @@
   .name { font-size: 14px; font-weight: 600; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .badge { font-size: 10px; font-weight: 600; color: #fff; background: var(--c); padding: 2px 8px; border-radius: 99px; }
   .x { background: none; border: none; cursor: pointer; font-size: 14px; color: var(--color-text-tertiary); }
+  .ghlink { font-size: 10px; padding: 2px 8px; border-radius: 99px; white-space: nowrap; text-decoration: none;
+    border: 0.5px solid var(--color-border-secondary); background: var(--color-background-secondary); color: var(--color-text-secondary); }
+  .ghlink:hover { color: var(--color-text-primary); border-color: var(--accent, #6366F1); }
   .meta { font-size: 11px; color: var(--color-text-secondary); display: flex; gap: 4px; flex-wrap: wrap; }
   .path { font-size: 10px; color: var(--color-text-tertiary); word-break: break-all; }
   .mono { font-family: var(--font-mono); }
