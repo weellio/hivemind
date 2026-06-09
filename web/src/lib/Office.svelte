@@ -6,7 +6,10 @@
   import AgentModal from './AgentModal.svelte';
 
   // Optional agents prop — if provided, we prefer it over self-polling.
-  let { agents: agentsProp = null } = $props();
+  let { agents: agentsProp = null, focusReq = null } = $props();
+  let _pendingFocus = null;   // {id} to centre on next frame
+  let _flash = null;          // {id, until} highlight ring
+  $effect(() => { if (focusReq && focusReq.id) _pendingFocus = focusReq; });
 
   let polled = $state([]); // self-polled agents
   let canvas; // bound <canvas>
@@ -465,6 +468,18 @@
       const cooler = { x: _midX - 84, y: _topY };   // break area, top-centre-left
       const clock = { x: _midX + 84, y: _topY };    // punch clock, top-centre-right
 
+      // command-palette "go to agent" — centre the view on it and flash a ring
+      if (_pendingFocus) {
+        const fd = desks.get(_pendingFocus.id);
+        if (fd && fd.homeX != null) {
+          if (zoom < 0.85) zoom = 1;
+          panX = cssW / 2 - fd.homeX * zoom;
+          panY = cssH / 2 - fd.homeY * zoom;
+          _flash = { id: _pendingFocus.id, until: t + 2.4 };
+        }
+        _pendingFocus = null;
+      }
+
       // ── rooms: team rooms enclose the orchestrator + its cubicle floor; solo
       // orchestrators each get their own small private office. ──
       ctx.save();
@@ -622,6 +637,15 @@
           ctx.strokeStyle = hexA('#F59E0B', 0.4 + 0.45 * pulse);
           ctx.lineWidth = 2; ctx.setLineDash([5, 4]);
           ctx.beginPath(); ctx.arc(drawX, drawY, haloR * 0.7, 0, Math.PI * 2); ctx.stroke();
+          ctx.restore();
+        }
+        // command-palette flash ring
+        if (_flash && _flash.id === agent.id && t < _flash.until) {
+          const k = (_flash.until - t) / 2.4;
+          ctx.save();
+          ctx.strokeStyle = hexA('#6366F1', 0.35 + 0.5 * (0.5 + 0.5 * Math.sin(t * 9)));
+          ctx.lineWidth = 3; ctx.setLineDash([]);
+          ctx.beginPath(); ctx.arc(drawX, drawY, haloR * (0.85 + 0.7 * (1 - k)), 0, Math.PI * 2); ctx.stroke();
           ctx.restore();
         }
 

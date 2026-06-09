@@ -14,6 +14,7 @@
   import HelpPanel from './lib/HelpPanel.svelte';
   import FeedPanel from './lib/FeedPanel.svelte';
   import SearchPanel from './lib/SearchPanel.svelte';
+  import CommandPalette from './lib/CommandPalette.svelte';
   import Hierarchy from './lib/Hierarchy.svelte';
   import ThemeMenu from './lib/ThemeMenu.svelte';
   import Office from './lib/Office.svelte';
@@ -118,6 +119,28 @@
   let panels = $state({ projects: false, usage: false, github: false, config: false, history: false, health: false, feed: false, search: false });
   function openP(k) { panels[k] = true; menuOpen = false; }
   let transcriptId = $state(null);
+  let paletteOpen = $state(false);
+  let focusReq = $state(null);
+  function onGlobalKey(e) {
+    if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); paletteOpen = true; }
+  }
+  let paletteItems = $derived.by(() => {
+    const cmds = [
+      { label: 'Projects & components', sub: 'panel', action: () => openP('projects') },
+      { label: 'Usage / cost', sub: 'panel', action: () => openP('usage') },
+      { label: 'GitHub', sub: 'panel', action: () => openP('github') },
+      { label: 'Config · hooks · MCP · Telegram · budget', sub: 'panel', action: () => openP('config') },
+      { label: 'Session history', sub: 'panel', action: () => openP('history') },
+      { label: 'Search', sub: 'panel', action: () => openP('search') },
+      { label: 'Activity feed', sub: 'panel', action: () => openP('feed') },
+      { label: 'Health / status', sub: 'panel', action: () => openP('health') },
+      { label: $soundOn ? 'Mute alert sound' : 'Unmute alert sound', sub: 'toggle', action: () => ($soundOn = !$soundOn) },
+      { label: 'Office floor view', sub: 'view', action: () => ($layout = 'office') },
+      { label: 'Mosaic view', sub: 'view', action: () => ($layout = 'mosaic') },
+    ];
+    for (const a of shown) cmds.push({ label: 'Go to ' + (a.name || a.id), sub: (a.project || '') + ' · ' + (a.state || ''), action: () => { $layout = 'office'; focusReq = { id: a.id, t: Date.now() }; } });
+    return cmds;
+  });
 
   onMount(() => {
     poll();
@@ -179,6 +202,9 @@
   }
   function clearImages() { if (confirm('Clear all imported images?')) images.set([]); }
 </script>
+
+<svelte:window onkeydown={onGlobalKey} />
+<CommandPalette bind:open={paletteOpen} items={paletteItems} />
 
 <div class="dashboard">
   {#if license.licensed === false}
@@ -295,7 +321,7 @@
   {#if shown.length === 0}
     <div class="empty">No agents reporting yet. Run <code>/hooks</code> in a Claude Code session (or start a new one) to begin.</div>
   {:else if $layout === 'office'}
-    <div class="office-wrap"><Office agents={shown} /></div>
+    <div class="office-wrap"><Office agents={shown} {focusReq} /></div>
   {:else}
     <div class="grid">
       {#each shown as agent (agent.id)}
