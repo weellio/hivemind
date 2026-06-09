@@ -23,7 +23,7 @@
   // Bundled default "action images" — the initial template for Your-image mode.
   // Drop one PNG per state into web/public/actions/<state>.png; users override via Action images….
   const DEFAULT_ACTION_STATES = new Set(['idle', 'thinking', 'coding', 'spawning', 'reading', 'testing', 'error', 'done']);
-  function defaultAction(state) { return DEFAULT_ACTION_STATES.has(state) ? `/actions/${state}.png` : null; }
+  function defaultAction(state) { return DEFAULT_ACTION_STATES.has(state) ? `/actions/${state}.jpg` : null; }
   function onImgErr(e) { const ph = placeholder(agent); if (!String(e.target.src).startsWith('data:')) e.target.src = ph; }
 
   // Stable per-agent key (name/project persist across sessions; id is the fallback).
