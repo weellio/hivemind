@@ -5,6 +5,20 @@
   let error = $state('');
   let data = $state(null); // { sessionId, cwd, project, messages, count, truncated }
   let bodyEl = $state();
+
+  // drag-to-resize width (the drawer is anchored right), remembered per browser
+  let width = $state(Number(localStorage.getItem('aoc-transcript-w')) || 520);
+  let resizing = false;
+  function onResize(e) { if (resizing) width = Math.max(360, Math.min(window.innerWidth - 40, window.innerWidth - e.clientX)); }
+  function endResize() {
+    resizing = false; document.body.style.userSelect = '';
+    window.removeEventListener('pointermove', onResize); window.removeEventListener('pointerup', endResize);
+    try { localStorage.setItem('aoc-transcript-w', String(Math.round(width))); } catch (_) {}
+  }
+  function startResize(e) {
+    resizing = true; e.preventDefault(); document.body.style.userSelect = 'none';
+    window.addEventListener('pointermove', onResize); window.addEventListener('pointerup', endResize);
+  }
   // jump to the newest message (bottom) once a transcript loads
   $effect(() => { if (data && bodyEl) requestAnimationFrame(() => { if (bodyEl) bodyEl.scrollTop = bodyEl.scrollHeight; }); });
 
@@ -96,7 +110,8 @@
   <div class="ov" onclick={close} role="presentation"></div>
 
   <!-- drawer -->
-  <aside class="drawer" role="dialog" aria-label="Transcript viewer">
+  <aside class="drawer" role="dialog" aria-label="Transcript viewer" style="width: {width}px">
+    <div class="resize" onpointerdown={startResize} title="Drag to resize" role="separator" aria-label="Resize transcript"></div>
     <div class="hd">
       <div class="hd-left">
         <strong class="title">Transcript</strong>
@@ -170,7 +185,7 @@
     right: 0;
     bottom: 0;
     z-index: 129;
-    width: 520px;
+    width: 520px;     /* overridden by the inline drag width */
     max-width: 96vw;
     background: var(--color-background-primary);
     border-left: 0.5px solid var(--color-border-secondary);
@@ -179,6 +194,13 @@
     flex-direction: column;
     overflow: hidden;
   }
+
+  /* Drag-to-resize handle on the left edge */
+  .resize {
+    position: absolute; left: 0; top: 0; bottom: 0; width: 6px;
+    cursor: ew-resize; z-index: 5; touch-action: none;
+  }
+  .resize:hover, .resize:active { background: var(--accent, #6366F1); opacity: 0.5; }
 
   /* Header */
   .hd {
