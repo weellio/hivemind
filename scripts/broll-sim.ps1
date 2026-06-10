@@ -69,7 +69,6 @@ function RootIds { return @($sessions | ForEach-Object { $_.id }) }
 function Cleanup {
   # roots are kept-on-remove by the bridge; demote them first so they fully delete
   foreach ($s in $sessions) { ev @{ agentId = $s.id; root = $false } }
-  ev @{ agentId = 'broll-rogue'; root = $false }   # the runaway is a root too
   foreach ($id in (AllIds)) { RemoveAgent $id }
 }
 
@@ -168,52 +167,49 @@ function Scene3 {
   Pause "Capture the Usage panel, then Enter for the next scene"
 }
 
-# -------------------------------------------------------------- Scene 4: ROGUE
+# ---------------------------------------------------- Scene 4: STOP A STRAY AGENT
 function Scene4 {
-  Write-Host "`n=== SCENE 4: click an agent -> stop the rogue (slot 3) ===" -ForegroundColor Cyan
-  Write-Host "Narration: 'that rabbit-hole session? stopped in one click.'"
-  Write-Host "DASHBOARD: grid or floor. CLICK the red 'frontend' session (its own office),"
-  Write-Host "           show its modal (cost + burn + last message), then press Stop."
+  Write-Host "`n=== SCENE 4: click the stuck sub-agent -> stop it (slot 3) ===" -ForegroundColor Cyan
+  Write-Host "Narration: 'that sub-agent stuck in a retry loop? stopped in one click.'"
+  Write-Host "DASHBOARD: grid or floor. CLICK the red erroring sub-agent in WaivePulse's"
+  Write-Host "           swarm, show its modal (last message: 'attempt 47...'), then Stop."
   Pause "Get ready to record the click + Stop"
 
   BuildAll
-  # background life on the other sessions (sub-agents don't show cost -- only sessions do)
+  # background life on the other sub-agents
   ev @{ agentId = 'broll-s1-w1'; state = 'reading' }
   ev @{ agentId = 'broll-s1-w2'; state = 'coding' }
   ev @{ agentId = 'broll-s2-w0'; state = 'testing' }
-  # The runaway is a SESSION (root) stuck in a retry loop. Cost/burn belong to a
-  # session, not a sub-agent, so this matches how the real product behaves: it shows
-  # as its own office, glowing red, $/min climbing. (~$7/min ~= a stuck Opus session
-  # at API list prices -- a believable demo number, not a wild one.)
-  ev @{ agentId = 'broll-rogue'; name = 'frontend'; root = $true; project = $proj; cwd = $repo;
-       state = 'coding'; costUSD = 8.20; burnRate = 7.40; runaway = $true;
+  # The stoppable target is a STRAY SUB-AGENT stuck in a retry loop -> 'error' state
+  # (red ring + !!), with a juicy last message. NO dollar amount on it: sub-agents
+  # don't show cost (only sessions do), so nothing here is fabricated. The cost/spend
+  # story lives in Scene 3 (the real Usage panel).
+  ev @{ agentId = 'broll-rogue'; name = 'general-purpose'; parentId = 'broll-s1'; project = $proj; cwd = $repo;
+       state = 'error';
        lastMessage = 'Retrying tool call (attempt 47): command timed out, re-running the same search again...';
        log = 'looping: re-running search (attempt 47)' }
 
-  Write-Host "[LIVE] A stuck session ('frontend') is glowing red, `$/min climbing." -ForegroundColor Green
-  Write-Host "       Click it -> read the modal -> click Stop and it will CLOCK OUT on camera." -ForegroundColor Green
+  Write-Host "[LIVE] A stray sub-agent is stuck in a retry loop (red, !!) -- no dollar amount on it." -ForegroundColor Green
+  Write-Host "       Click it -> read the loop in the modal -> click Stop and it CLOCKS OUT on camera." -ForegroundColor Green
   Write-Host "       (Or press Enter to advance without stopping it.)" -ForegroundColor Green
   DrainKeys
   # The rogue is a fake agent, so a real Stop has nothing to halt -- but the click
   # queues a 'stop' command on the bridge, which we watch for here and then play out
-  # the stop visually (done -> confetti -> clock out). Baseline the queue so leftover
-  # stops from a previous take don't trigger instantly on a re-run.
+  # the stop visually (done -> clock out). Baseline the queue so leftover stops from a
+  # previous take don't trigger instantly on a re-run.
   $rsid = 'broll-rogue'
   $stateUrl = "http://localhost:$Port/api/state"
   function StopCount { try { $s = Invoke-RestMethod -Uri $stateUrl -TimeoutSec 2; if ($s.pending) { $v = $s.pending.$rsid; if ($v) { return [int]$v } } } catch {}; return 0 }
   $baseStops = StopCount
-  $cost = 8.20
   while (-not (EnterPressed)) {
     if ((StopCount) -gt $baseStops) {
-      ev @{ agentId = 'broll-rogue'; state = 'done'; burnRate = 0; runaway = $false; log = 'stopped by you -- clocking out' }
-      Write-Host "[LIVE] Stop received -> session clocking out. Re-run -Scene 4 for another take." -ForegroundColor Green
+      ev @{ agentId = 'broll-rogue'; state = 'done'; log = 'stopped by you -- clocking out' }
+      Write-Host "[LIVE] Stop received -> sub-agent clocking out. Re-run -Scene 4 for another take." -ForegroundColor Green
       Start-Sleep -Seconds 2
-      ev @{ agentId = 'broll-rogue'; root = $false }   # demote so it can be fully removed
       RemoveAgent 'broll-rogue'
       break
     }
-    $cost = [math]::Round($cost + (Get-Random -Minimum 8 -Maximum 16) / 100.0, 2)
-    ev @{ agentId = 'broll-rogue'; state = 'coding'; costUSD = $cost; burnRate = (Get-Random -Minimum 650 -Maximum 880) / 100.0; runaway = $true }
+    ev @{ agentId = 'broll-rogue'; state = 'error'; log = 'looping: re-running search (attempt 47)' }   # keep it stuck/alive
     # gentle background life across the other sessions
     ev @{ agentId = ((WorkerIds) | Get-Random); state = ($work | Get-Random) }
     Start-Sleep -Milliseconds 1300
