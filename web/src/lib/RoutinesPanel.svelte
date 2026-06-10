@@ -55,6 +55,8 @@
   function rel(ts) { if (!ts) return ''; const s = Math.floor((Date.now() - ts) / 1000); if (s < 60) return s + 's ago'; const m = Math.floor(s / 60); if (m < 60) return m + 'm ago'; const h = Math.floor(m / 60); if (h < 24) return h + 'h ago'; return new Date(ts).toLocaleDateString(); }
   function dur(ms) { const s = Math.round(ms / 1000); return s < 60 ? s + 's' : Math.floor(s / 60) + 'm' + (s % 60) + 's'; }
 
+  function runAll() { status = '▶ running all routines headlessly…'; for (const r of routines) run(r); }
+
   let scheduled = $derived(routines.filter((r) => r.enabled && r.schedule).length);
   let lastBrief = $derived(briefings[0]);
 </script>
@@ -67,6 +69,7 @@
     <div class="hd">
       <strong>Routines &amp; Briefings</strong>
       <div class="hd-actions">
+        {#if routines.length > 1}<button class="mini" onclick={runAll} title="Run every routine now">▶ Run all</button>{/if}
         <button class="mini" onclick={newRoutine}>＋ New routine</button>
         <button class="x" onclick={closePanel} aria-label="Close">✕</button>
       </div>
