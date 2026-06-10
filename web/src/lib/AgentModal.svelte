@@ -115,7 +115,9 @@
       const r = await fetch('/api/sendkeys', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: sid, keys }) });
       const j = await r.json();
       const pretty = keys.replace('{ENTER}', '↵').replace('{ESC}', 'Esc').replace('{UP}', '↑').replace('{DOWN}', '↓');
-      showFlash(j && j.ok ? '⌨ sent ' + pretty : '✗ ' + ((j && j.error) || 'failed'));
+      if (j && j.ok && j.found) showFlash('⌨ sent ' + pretty);
+      else if (j && j.ok) showFlash("✗ couldn't find this session's window — open it. (Bare terminals title as “Claude Code”; quick-keys target by project name, which works for VS Code.)");
+      else showFlash('✗ ' + ((j && j.error) || 'failed'));
     } catch (_) { showFlash('✗ Failed — is the bridge running?'); }
   }
   function onKey(e) { if (e.key === 'Escape') onClose(); }

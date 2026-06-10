@@ -1113,12 +1113,19 @@ const server = http.createServer(async (req, res) => {
     const root = agents.get('sess:' + body.sessionId) || Array.from(agents.values()).find((a) => a.sessionId === body.sessionId);
     const match = (root && root.project) || String(body.sessionId);
     const keys = String(body.keys).slice(0, 40);
-    if (process.platform === 'win32') {
-      spawnSafe('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(SCRIPTS_DIR, 'sendkeys.ps1'), '-Match', match, '-Keys', keys], { windowsHide: true });
-    } else {
-      spawnSafe('bash', [path.join(SCRIPTS_DIR, 'sendkeys.sh'), '--match', match, '--keys', keys], {});
-    }
-    return sendJson(res, 200, { ok: true, match });
+    // run the helper and capture its output so we can report whether the session's
+    // window was actually found (it titles itself by project; bare terminals running
+    // Claude show as "Claude Code", so they won't match — report that honestly).
+    const cmd = process.platform === 'win32' ? 'powershell' : 'bash';
+    const args = process.platform === 'win32'
+      ? ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(SCRIPTS_DIR, 'sendkeys.ps1'), '-Match', match, '-Keys', keys]
+      : [path.join(SCRIPTS_DIR, 'sendkeys.sh'), '--match', match, '--keys', keys];
+    execFile(cmd, args, { timeout: 9000, windowsHide: true }, (err, stdout) => {
+      const out = String(stdout || '');
+      const found = !/no open window|no window matched|install xdotool/i.test(out);
+      sendJson(res, 200, { ok: true, found, match });
+    });
+    return;
   }
 
   if (url === '/api/drop-image' && req.method === 'POST') {
