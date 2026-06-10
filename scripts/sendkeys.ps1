@@ -10,9 +10,10 @@
   CAVEAT: steals focus and types into whatever control is focused in that window — keep
   the Claude terminal focused. Try -DryRun first.
 #>
-param([int]$Port = 3131, [string]$Match = '', [string]$Keys = '', [switch]$DryRun)
+param([int]$Port = 3131, [string]$Match = '', [string]$Keys = '', [int]$WinPid = 0, [switch]$DryRun)
 
-if (-not $Match -or $Keys -eq '') { Write-Host "[sendkeys] need -Match and -Keys"; exit 0 }
+if ($Keys -eq '') { Write-Host "[sendkeys] need -Keys"; exit 0 }
+if (-not $Match -and $WinPid -le 0) { Write-Host "[sendkeys] need -Match or -WinPid"; exit 0 }
 
 try {
   Add-Type -ErrorAction Stop @"
@@ -45,15 +46,26 @@ public class HmKeys {
 "@
 } catch {}
 
-$procId = [HmKeys]::FindPid($Match)
-if (-not $procId) { Write-Host "[sendkeys] no open window contains '$Match'"; exit 0 }
-Write-Host "[sendkeys] '$Keys' -> window containing '$Match' (pid $procId)"
-if ($DryRun) { exit 0 }
-
 $wsh = New-Object -ComObject WScript.Shell
-if ($wsh.AppActivate([int]$procId)) {
-  Start-Sleep -Milliseconds 250
-  $wsh.SendKeys($Keys)
+function SendTo($p) {
+  if ($DryRun) { Write-Host "[sendkeys] would send '$Keys' to pid $p"; return $true }
+  if ($wsh.AppActivate([int]$p)) { Start-Sleep -Milliseconds 250; $wsh.SendKeys($Keys); return $true }
+  return $false
+}
+
+# 1) Prefer the PID captured at launch (survives Claude renaming the title to "Claude Code").
+if ($WinPid -gt 0) {
+  Write-Host "[sendkeys] '$Keys' -> captured pid $WinPid"
+  if (SendTo $WinPid) { exit 0 }
+  Write-Host "[sendkeys] captured pid $WinPid not activatable; trying title"
+}
+
+# 2) Fall back to matching the window by title (works for VS Code-hosted sessions).
+if ($Match) {
+  $procId = [HmKeys]::FindPid($Match)
+  if (-not $procId) { Write-Host "[sendkeys] no open window contains '$Match'"; exit 0 }
+  Write-Host "[sendkeys] '$Keys' -> window containing '$Match' (pid $procId)"
+  if (-not (SendTo $procId)) { Write-Host "[sendkeys] found pid $procId but could not activate it" }
 } else {
-  Write-Host "[sendkeys] found pid $procId but could not activate it"
+  Write-Host "[sendkeys] no open window contains '$Match'"
 }

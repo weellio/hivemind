@@ -32,6 +32,7 @@ const github = require('./github.js');
 const configmgr = require('./configmgr.js');
 const history = require('./history.js');
 const routines = require('./routines.js');
+const projKeyOf = projects.keyOf;   // module ref (snapshot() has a local `projects` that shadows it)
 const health = require('./health.js');
 const transcript = require('./transcript.js');
 const search = require('./search.js');
@@ -540,6 +541,25 @@ function onBriefing(b) {
 }
 function runRoutineOpts() { return { cli: claudeCliRaw(), onDone: onBriefing }; }
 
+// The (brief) window title we set at launch, before Claude renames the terminal to
+// "Claude Code". capture-window.ps1 finds the window by this so we can target by PID.
+function launchTitle(cwd) { return 'Hivemind: ' + (path.basename(cwd || '') || 'Claude'); }
+
+// cwd-keyed map of captured session window PIDs (so quick-keys / nudge can target the
+// window even after Claude renames its title). Windows only.
+const sessionWindows = new Map();
+function captureWin(cwd) {
+  if (process.platform !== 'win32' || !cwd) return;
+  const title = launchTitle(cwd);
+  try {
+    execFile('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(SCRIPTS_DIR, 'capture-window.ps1'), '-Title', title, '-TimeoutMs', '6000'],
+      { timeout: 8000, windowsHide: true }, (err, stdout) => {
+        const pid = parseInt(String(stdout || '').trim(), 10);
+        if (pid > 0) { sessionWindows.set(projKeyOf(cwd), { pid, ts: Date.now() }); console.log(`[capture] window pid ${pid} for ${title}`); }
+      });
+  } catch (_) {}
+}
+
 function launchSession(cwd, resume, prompt) {
   if (resume && !/^[\w-]+$/.test(resume)) return { error: 'bad session id' };
   // optional initial task: strip quotes/newlines, cap length, wrap for the shell
@@ -559,7 +579,7 @@ function launchSession(cwd, resume, prompt) {
   for (const k of Object.keys(env)) if (/^CLAUDE_?CODE/i.test(k)) delete env[k];
   try {
     if (process.platform === 'win32') {
-      spawn(`start "Hivemind: Claude" cmd /k ${inner}`, { cwd, shell: true, detached: true, stdio: 'ignore', env }).unref();
+      spawn(`start "${launchTitle(cwd)}" cmd /k ${inner}`, { cwd, shell: true, detached: true, stdio: 'ignore', env }).unref();
     } else if (process.platform === 'darwin') {
       spawn('osascript', ['-e', `tell app "Terminal" to do script "cd '${cwd}' && unset CLAUDECODE CLAUDE_CODE_SSE_PORT CLAUDE_CODE_ENTRYPOINT && ${inner}"`], { detached: true, stdio: 'ignore', env }).unref();
     } else {
@@ -614,6 +634,7 @@ function snapshot() {
   for (const a of list) {
     const active = a.state !== 'idle' && a.state !== 'done';
     a.runaway = active && (a.runawayManual || ((Number(a.burnRate) || 0) >= BURN_ALERT && (a.burnStreak || 0) >= 2));
+    if (a.root && a.cwd) { const w = sessionWindows.get(projKeyOf(a.cwd)); a.winPid = w ? w.pid : undefined; }
   }
   const byProject = {};
   for (const a of list) {
@@ -956,6 +977,7 @@ const server = http.createServer(async (req, res) => {
     if (!body || !body.cwd) return sendJson(res, 400, { error: 'cwd required' });
     if (!fs.existsSync(body.cwd)) return sendJson(res, 400, { error: 'path not found' });
     const r = launchSession(body.cwd, body.resume, body.prompt);
+    if (r.ok) captureWin(body.cwd);   // remember the window's PID so quick-keys/nudge can reach it
     return sendJson(res, r.error ? 400 : 200, r);
   }
 
@@ -1113,12 +1135,12 @@ const server = http.createServer(async (req, res) => {
     const root = agents.get('sess:' + body.sessionId) || Array.from(agents.values()).find((a) => a.sessionId === body.sessionId);
     const match = (root && root.project) || String(body.sessionId);
     const keys = String(body.keys).slice(0, 40);
-    // run the helper and capture its output so we can report whether the session's
-    // window was actually found (it titles itself by project; bare terminals running
-    // Claude show as "Claude Code", so they won't match — report that honestly).
+    // Prefer the PID captured at launch (survives Claude renaming the title); fall back
+    // to matching the window by project name (works for VS Code-hosted sessions).
+    const win = root && root.cwd ? sessionWindows.get(projKeyOf(root.cwd)) : null;
     const cmd = process.platform === 'win32' ? 'powershell' : 'bash';
     const args = process.platform === 'win32'
-      ? ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(SCRIPTS_DIR, 'sendkeys.ps1'), '-Match', match, '-Keys', keys]
+      ? ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(SCRIPTS_DIR, 'sendkeys.ps1'), '-Match', match, '-Keys', keys, ...(win ? ['-WinPid', String(win.pid)] : [])]
       : [path.join(SCRIPTS_DIR, 'sendkeys.sh'), '--match', match, '--keys', keys];
     execFile(cmd, args, { timeout: 9000, windowsHide: true }, (err, stdout) => {
       const out = String(stdout || '');

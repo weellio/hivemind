@@ -110,10 +110,13 @@ $wsh = New-Object -ComObject WScript.Shell
 
 foreach ($a in $targets) {
   $title = $a.project
-  if (-not $title) { continue }
-  $procId = [HmWin]::FindPid($title)
+  # prefer the PID captured at launch (survives Claude renaming the terminal title);
+  # fall back to matching the window by project name (works for VS Code).
+  $procId = 0
+  if ($a.winPid) { $procId = [int]$a.winPid }
+  if ((-not $procId) -and $title) { $procId = [HmWin]::FindPid($title) }
   if (-not $procId) {
-    Write-Host "  [nudge] no open window contains '$title' - is that session's VS Code/terminal open?"
+    Write-Host "  [nudge] no window for '$title' (no captured pid, and title not found)"
     continue
   }
   if ($procId -eq [HmWin]::ForegroundPid()) {
