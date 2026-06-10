@@ -20,7 +20,8 @@ It attaches to any project automatically via Claude Code **hooks** — no manual
 - **Recursive hierarchy view** — connectors from each agent to its sub-agents at any depth, with subtree hover-highlight and animated parent→child flow.
 - **Office floor + Mosaic views** — a top-down animated office where agents walk, gather at the water cooler, and route packets to their sub-agents; or a compact responsive tile grid.
 - **3 avatar tiers** — pixel art (procedural Canvas), abstract (waveforms/EQ/rings), and top-down desk people / your own images.
-- **Click any agent** — a modal to read its current task, reply, stop it, or open its folder / VS Code.
+- **Click any agent** — a modal to read its current task, reply, stop it, **focus its window** (raise the live terminal it's running in), or open its folder / VS Code.
+- **Per-session analytics** — each agent's modal shows efficiency gauges parsed from its transcript: **cache-hit %** (context reused vs re-sent), **output-cost share** (verbose answers vs context bulk), and a **context-window bar** that fills amber→red toward the model limit. When a parked session is near full, a **Compact now** nudge types `/compact` for you — freeing context and the cache-read you'd pay on every later turn.
 - **Live cost + runaway alerts** — each agent tile shows its session spend, and any agent burning money fast (a stuck/looping session) lights up red with a `💸 $/min` badge so you can catch it and stop it before it runs up a bill. Toggle off in Settings if you don't care about spend.
 
 ## Control center — manage Claude Code, not just watch it
@@ -35,6 +36,7 @@ Beyond visualization, Hivemind is a local control panel for everything Claude Co
 - **History** — recent sessions across all projects with their first prompt; **▶ Resume** any one (`claude --resume <id>` in a terminal) or copy the command.
 - **Telegram** — get pinged when a session is waiting on you, and reply or `/stop` from your phone.
 - **＋ New task** — a top-bar button (and `/`-palette entry): type a goal, pick a project, and it opens a new Claude session working on it.
+- **Bundled skills + agents** — install ships two into your `~/.claude`: **`component-builder`** (scaffold a new agent / skill / slash command from plain English) and **`context-audit`** (find what a project re-sends *every turn* — CLAUDE.md, MCP tool schemas, listed skills, memory — ranked by token cost, with a trim plan and a leaner CLAUDE.md rewrite). Just ask Claude *"why is this session so expensive?"* or *"audit my context / trim my CLAUDE.md"* — it reads the live cache-hit / context-fill gauges above and tells you exactly what to cut.
 
 > **Note:** **▶ Start** / **＋ New task** open a *fresh terminal* session, so Claude Code shows its one-time **"trust this folder"** prompt for that project — choose **"1. Yes, I trust this folder"** to continue. You normally don't see this when opening from VS Code because the folder is already trusted there.
 

@@ -20,6 +20,7 @@
         ['Current task', 'See the agent’s latest message / what it’s doing right now.'],
         ['Reply · Stop', 'Send a message or task to a running session, or stop it at its next tool.'],
         ['💰 Session cost', 'Live estimated spend for that session.'],
+        ['📊 Analytics', 'Per-session efficiency gauges from the transcript: cache-hit % (context reused vs re-sent), output-cost share (verbose vs context bulk), and a context-window bar. A parked, near-full session shows a “Compact now” nudge that types /compact to free context.'],
         ['📄 Transcript', 'Read the full conversation of the session.'],
         ['🪟 Focus window', 'Bring the running session’s terminal to the front — Hivemind raises the exact window it captured at launch (▶ Start / ＋ New task). Different from “Open in VS Code”, which opens the project folder.'],
         ['Open folder · VS Code', 'Jump to the project on disk or in your editor.'],
@@ -52,6 +53,7 @@
       title: 'Options & alerts',
       items: [
         ['Conserve tokens', 'Hivemind sends almost nothing to the model itself — the real per-turn cost is the MCP servers / skills a project loads. Trim them in Config.'],
+        ['Audit your context', 'Install ships a context-audit skill — in any session just ask “audit my context” or “trim my CLAUDE.md”. It reads each session’s cache-hit / context-fill, ranks what’s re-sent every turn (CLAUDE.md, MCP tool schemas, skills, memory), and proposes concrete cuts + a leaner CLAUDE.md.'],
         ['Cost budget', 'Set a daily / per-session spend cap (in Config) — get a banner + Telegram alert when crossed.'],
         ['Performance toggles', 'Alert sound, desktop notifications, auto-refresh cost, fast agent updates, and office animations.'],
         ['Status bar', 'Today’s + total spend is always visible.'],
