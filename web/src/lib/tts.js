@@ -3,6 +3,8 @@
 
 export const ttsAvailable = typeof window !== 'undefined' && 'speechSynthesis' in window;
 
+export function getVoices() { try { return window.speechSynthesis.getVoices() || []; } catch (_) { return []; } }
+
 // Strip markdown-ish noise so it reads naturally.
 function clean(text) {
   return String(text || '')
@@ -20,8 +22,9 @@ export function speak(text, opts = {}) {
   if (!ttsAvailable) return false;
   stopSpeaking();
   const u = new SpeechSynthesisUtterance(clean(text));
-  u.rate = opts.rate || 1;
+  u.rate = Math.max(0.5, Math.min(2, opts.rate || 1));
   u.pitch = opts.pitch || 1;
+  if (opts.voiceName) { const v = getVoices().find((x) => x.name === opts.voiceName); if (v) u.voice = v; }
   if (opts.onend) u.onend = opts.onend;
   if (opts.onerror) u.onerror = opts.onerror;
   try { window.speechSynthesis.speak(u); return true; } catch (_) { return false; }

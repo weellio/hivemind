@@ -1,11 +1,12 @@
 <script>
   import { ttsAvailable, speak, stopSpeaking } from './tts.js';
+  import { ttsVoice, ttsRate } from './stores.js';
   import MicButton from './MicButton.svelte';
   let { open = $bindable(false) } = $props();
   let speakingId = $state(null);
   function listen(b) {
     if (speakingId === b.id) { stopSpeaking(); speakingId = null; return; }
-    const ok = speak(b.output, { onend: () => { if (speakingId === b.id) speakingId = null; } });
+    const ok = speak(b.output, { voiceName: $ttsVoice, rate: $ttsRate, onend: () => { if (speakingId === b.id) speakingId = null; } });
     speakingId = ok ? b.id : null;
   }
   let _was = false;
@@ -45,7 +46,7 @@
   let runningIds = $state({});
   async function run(r) {
     runningIds = { ...runningIds, [r.id]: true };
-    status = '▶ running “' + r.name + '” — headless, this can take a bit…';
+    status = '⚙ compiling “' + r.name + '” — headless, this can take a bit…';
     const j = await (await fetch('/api/routines/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: r.id }) })).json();
     if (!(j && j.ok)) { status = '✗ ' + ((j && j.error) || 'could not start'); runningIds = { ...runningIds, [r.id]: false }; return; }
     // poll for the new briefing
@@ -63,7 +64,7 @@
   function rel(ts) { if (!ts) return ''; const s = Math.floor((Date.now() - ts) / 1000); if (s < 60) return s + 's ago'; const m = Math.floor(s / 60); if (m < 60) return m + 'm ago'; const h = Math.floor(m / 60); if (h < 24) return h + 'h ago'; return new Date(ts).toLocaleDateString(); }
   function dur(ms) { const s = Math.round(ms / 1000); return s < 60 ? s + 's' : Math.floor(s / 60) + 'm' + (s % 60) + 's'; }
 
-  function runAll() { status = '▶ running all routines headlessly…'; for (const r of routines) run(r); }
+  function runAll() { status = '⚙ compiling all routines headlessly…'; for (const r of routines) run(r); }
 
   let scheduled = $derived(routines.filter((r) => r.enabled && r.schedule).length);
   let lastBrief = $derived(briefings[0]);
@@ -77,7 +78,7 @@
     <div class="hd">
       <strong>Routines &amp; Briefings</strong>
       <div class="hd-actions">
-        {#if routines.length > 1}<button class="mini" onclick={runAll} title="Run every routine now">▶ Run all</button>{/if}
+        {#if routines.length > 1}<button class="mini" onclick={runAll} title="Run every routine now">Compile all</button>{/if}
         <button class="mini" onclick={newRoutine}>＋ New routine</button>
         <button class="x" onclick={closePanel} aria-label="Close">✕</button>
       </div>
@@ -135,7 +136,7 @@
           </div>
           <div class="rt-prompt">{r.prompt}</div>
           <div class="rt-actions">
-            <button class="run" disabled={runningIds[r.id]} onclick={() => run(r)}>{runningIds[r.id] ? '▶ running…' : '▶ Run now'}</button>
+            <button class="run" disabled={runningIds[r.id]} onclick={() => run(r)}>{runningIds[r.id] ? 'compiling…' : 'Compile now'}</button>
             <button class="mini" onclick={() => edit(r)}>Edit</button>
           </div>
         </div>

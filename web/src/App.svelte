@@ -1,8 +1,8 @@
 <script>
   import { onMount } from 'svelte';
   import { STATE_COLORS, STATE_LABEL } from './lib/states.js';
-  import { avatarMode, layout, images, soundOn, autoUsage, fastPoll, animations, desktopNotify, costAlerts, briefAloud } from './lib/stores.js';
-  import { speak as ttsSpeak } from './lib/tts.js';
+  import { avatarMode, layout, images, soundOn, autoUsage, fastPoll, animations, desktopNotify, costAlerts, briefAloud, ttsVoice, ttsRate } from './lib/stores.js';
+  import { speak as ttsSpeak, ttsAvailable, getVoices } from './lib/tts.js';
   import AgentTile from './lib/AgentTile.svelte';
   import AgentModal from './lib/AgentModal.svelte';
   import NewTask from './lib/NewTask.svelte';
@@ -143,12 +143,15 @@
   let freshBrief = $derived(latestBrief && latestBrief.ok && latestBrief.ts > briefSeen && (Date.now() - latestBrief.ts) < 14 * 3600 * 1000 ? latestBrief : null);
   function seenBrief() { briefSeen = latestBrief ? latestBrief.ts : Date.now(); try { localStorage.setItem('aoc-briefseen', String(briefSeen)); } catch (_) {} }
   function openBrief() { seenBrief(); openP('routines'); }
+  let voices = $state([]);
+  function loadVoices() { voices = getVoices(); }
+  function testVoice() { ttsSpeak('This is how your briefings will sound.', { voiceName: $ttsVoice, rate: $ttsRate }); }
   let _briefTs = 0;
   $effect(() => {
     if (latestBrief && latestBrief.ts > _briefTs) {
       const first = _briefTs === 0; _briefTs = latestBrief.ts;
       if (!first && latestBrief.ok && $desktopNotify) notifyDesktop({ name: '📋 ' + latestBrief.name, project: 'briefing ready' });
-      if (!first && latestBrief.ok && $briefAloud) ttsSpeak((latestBrief.name + '. ') + latestBrief.output);
+      if (!first && latestBrief.ok && $briefAloud) ttsSpeak((latestBrief.name + '. ') + latestBrief.output, { voiceName: $ttsVoice, rate: $ttsRate });
     }
   });
   const tourSteps = [
@@ -210,6 +213,7 @@
     try { if (!localStorage.getItem('aoc-toured')) setTimeout(() => (tourOpen = true), 800); } catch (_) {}
     // auto-refresh cost only when enabled (re-parsing transcripts is disk-heavy)
     pollBriefings();
+    if (ttsAvailable) { loadVoices(); try { window.speechSynthesis.onvoiceschanged = loadVoices; } catch (_) {} }
     const uid = setInterval(() => { if ($autoUsage) pollUsage(); }, 60000);
     const bid = setInterval(pollBriefings, 60000);
     return () => { clearInterval(uid); clearInterval(bid); };
@@ -405,6 +409,16 @@
             <label class="opt"><input type="checkbox" bind:checked={$autoUsage} /> Auto-refresh cost <span class="dim">(re-reads transcripts)</span></label>
             <label class="opt"><input type="checkbox" bind:checked={$costAlerts} /> Cost &amp; burn alerts <span class="dim">(tile $ + runaway flag)</span></label>
             <label class="opt"><input type="checkbox" bind:checked={$briefAloud} /> Read new briefings aloud <span class="dim">(🔊 text-to-speech)</span></label>
+            {#if ttsAvailable}
+              <label class="opt apr"><span>Voice</span>
+                <select class="aprsel" bind:value={$ttsVoice}>
+                  <option value="">Default ({voices.length} available)</option>
+                  {#each voices as v (v.name)}<option value={v.name}>{v.name}{v.lang ? ' · ' + v.lang : ''}</option>{/each}
+                </select>
+              </label>
+              <label class="opt apr"><span>Speed {Number($ttsRate).toFixed(1)}×</span><input type="range" min="0.6" max="1.6" step="0.1" bind:value={$ttsRate} /></label>
+              <button class="select" onclick={testVoice}>🔊 Test voice</button>
+            {/if}
             <label class="opt"><input type="checkbox" bind:checked={$fastPoll} /> Fast agent updates <span class="dim">(0.5s vs 2s)</span></label>
             <label class="opt"><input type="checkbox" bind:checked={$animations} /> Office animations <span class="dim">(CPU)</span></label>
           </div>
