@@ -183,7 +183,7 @@ function Scene4 {
   # the rogue: a worker inside WaivePulse's swarm, BURNING money fast (burnRate over
   # the $1/min threshold -> red runaway ring + 💸 badge), with a juicy last message.
   ev @{ agentId = 'broll-rogue'; name = 'general-purpose'; parentId = 'broll-s1'; project = $proj; cwd = $repo;
-       state = 'coding'; costUSD = 6.40; burnRate = 3.75;
+       state = 'coding'; costUSD = 12.40; burnRate = 7.80; runaway = $true;
        lastMessage = 'Retrying tool call (attempt 47): command timed out, re-running the same search again...';
        log = 'looping: re-running search (attempt 47)' }
 
@@ -208,8 +208,8 @@ function Scene4 {
       RemoveAgent 'broll-rogue'
       break
     }
-    $cost = [math]::Round($cost + (Get-Random -Minimum 5 -Maximum 12) / 100.0, 2)
-    ev @{ agentId = 'broll-rogue'; state = 'coding'; costUSD = $cost; burnRate = (Get-Random -Minimum 320 -Maximum 410) / 100.0 }
+    $cost = [math]::Round($cost + (Get-Random -Minimum 10 -Maximum 22) / 100.0, 2)
+    ev @{ agentId = 'broll-rogue'; state = 'coding'; costUSD = $cost; burnRate = (Get-Random -Minimum 700 -Maximum 920) / 100.0; runaway = $true }
     # gentle background life across the other sessions
     ev @{ agentId = ((WorkerIds) | Get-Random); state = ($work | Get-Random) }
     Start-Sleep -Milliseconds 1300

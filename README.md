@@ -207,7 +207,7 @@ States: `idle · thinking · coding · spawning · reading · testing · error �
 - **Port** — `AOC_PORT` (default `3131`).
 - **Telegram alerts/replies** — `{ "telegramToken": "...", "telegramChatId": "...", "dashboardUrl": "..." }` (or `AOC_TG_TOKEN` / `AOC_TG_CHAT` / `AOC_DASH_URL`). For inbound replies, the bot must have no webhook — use a dedicated bot via `"telegramReplyToken"` if needed.
 - **Avatar images** — imported from the dashboard (**Images…** / **Action images…**), stored in the browser's localStorage.
-- **Runaway burn threshold** — `{ "burnAlert": 1.0 }` ($/min). Any active session spending faster than this gets the red "runaway" highlight (default `1.0`). The visual itself can be toggled per-browser in Settings → *Cost & burn alerts*.
+- **Runaway burn threshold** — `{ "burnAlert": 5.0 }` ($/min, default `5.0`). An active session gets the red "runaway" highlight only when its smoothed spend stays above this for two samples in a row (so a single big turn doesn't trip it). The visual can be toggled per-browser in Settings → *Cost & burn alerts*. Note: spend is *estimated* from token counts at API list prices.
 - **Claude command / path** — `{ "claudeCmd": "" }`. The **▶ Start** / Resume buttons run `claude` (on PATH) by default. If you get *"'claude' is not recognized"*, set this to the full path to the CLI — find it with `where claude` (Windows) / `which claude` (macOS/Linux), e.g. `C:\Users\you\.local\bin\claude.exe`. Also settable from Settings → *Claude command / path*.
 
 ## Support

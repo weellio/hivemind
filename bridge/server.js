@@ -236,8 +236,8 @@ async function checkBudget() {
 // The budget alerts above are about TOTAL spend. This samples each live session's
 // cost over time so a stuck/looping agent shows a red "runaway" highlight on its
 // tile in real time. Threshold is $/min; demo/manual agents can set it directly.
-const BURN_ALERT = Number(cfg.burnAlert) > 0 ? Number(cfg.burnAlert) : 1.0; // $/min
-const costSamples = new Map();   // sessionId -> { cost, ts }
+const BURN_ALERT = Number(cfg.burnAlert) > 0 ? Number(cfg.burnAlert) : 5.0; // $/min (sustained)
+const costSamples = new Map();   // sessionId -> { cost, ts, ema, streak }
 function sidOf(a) { return a.sessionId || (String(a.id).startsWith('sess:') ? String(a.id).slice(5) : null); }
 async function sampleBurn() {
   try {
@@ -250,13 +250,24 @@ async function sampleBurn() {
       if (!sid) continue;
       const s = u.bySession[sid];
       if (!s) continue;
-      const prev = costSamples.get(sid);
       a.costUSD = s.costUSD;
-      if (prev && now > prev.ts) {
-        const rate = (s.costUSD - prev.cost) / ((now - prev.ts) / 60000);
-        a.burnRate = Math.max(0, rate);
+      let rec = costSamples.get(sid);
+      if (!rec) { costSamples.set(sid, { cost: s.costUSD, ts: now, ema: 0, streak: 0 }); a.burnRate = 0; a.burnStreak = 0; continue; }
+      // The usage summary is cached (60s TTL) while we sample every 30s, so equal
+      // snapshots carry no new info — measure the rate over the REAL window since the
+      // cost last changed (not the sample gap), then smooth it (EMA) so one big turn
+      // doesn't spike a believable number into the hundreds.
+      if (s.costUSD > rec.cost + 1e-9) {
+        const mins = (now - rec.ts) / 60000;
+        const inst = mins > 0.08 ? (s.costUSD - rec.cost) / mins : 0;   // ignore <5s windows
+        rec.ema = rec.ema > 0 ? rec.ema * 0.6 + inst * 0.4 : inst;
+        rec.cost = s.costUSD; rec.ts = now;
+        rec.streak = rec.ema >= BURN_ALERT ? rec.streak + 1 : 0;
+      } else if ((now - rec.ts) / 60000 > 1.5) {        // spend stalled → decay toward 0, clear the flag
+        rec.ema *= 0.5; rec.streak = 0;
       }
-      costSamples.set(sid, { cost: s.costUSD, ts: now });
+      a.burnRate = Math.round(rec.ema * 100) / 100;
+      a.burnStreak = rec.streak;
     }
   } catch (_) {}
 }
@@ -565,7 +576,7 @@ function snapshot() {
   const list = Array.from(agents.values());
   for (const a of list) {
     const active = a.state !== 'idle' && a.state !== 'done';
-    a.runaway = active && (a.runawayManual || (Number(a.burnRate) || 0) >= BURN_ALERT);
+    a.runaway = active && (a.runawayManual || ((Number(a.burnRate) || 0) >= BURN_ALERT && (a.burnStreak || 0) >= 2));
   }
   const byProject = {};
   for (const a of list) {
