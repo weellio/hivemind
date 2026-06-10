@@ -56,7 +56,7 @@
     } catch (_) {}
   }
   onMount(() => {
-    refresh().then(() => { loadInfo(); loadCost(); loadGithub(); });
+    refresh().then(() => { loadInfo(); loadCost(); loadGithub(); loadProcs(); });
     const t = setInterval(refresh, 1200);
     return () => clearInterval(t);
   });
@@ -154,6 +154,24 @@
       else showFlash('✗ ' + ((j && j.error) || 'failed'));
     } catch (_) { showFlash('✗ Failed — is the bridge running?'); }
   }
+  // Processes this session spawned and left running (dev servers, node, python…).
+  let procs = $state([]);
+  async function loadProcs() {
+    if (!agent || !agent.root) return;
+    try {
+      const r = await fetch('/api/processes');
+      const j = await r.json();
+      procs = (j.processes || []).filter((p) => p.sessionId && sid && p.sessionId === sid);
+    } catch (_) {}
+  }
+  async function killProc(p) {
+    const where = p.ports && p.ports.length ? ` on port ${p.ports.join(', ')}` : '';
+    if (!confirm(`Kill ${p.name} (pid ${p.pid})${where}? Force-kills it and its child tree.`)) return;
+    try { await fetch('/api/kill-process', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pid: p.pid }) }); showFlash('■ killed pid ' + p.pid); }
+    catch (_) { showFlash('✗ kill failed'); }
+    setTimeout(loadProcs, 400);
+  }
+  function upShort(ms) { if (ms == null) return ''; const s = Math.floor(ms / 1000), m = Math.floor(s / 60), h = Math.floor(m / 60); return h > 0 ? h + 'h' : (m > 0 ? m + 'm' : s + 's'); }
   function onKey(e) { if (e.key === 'Escape') onClose(); }
   function onReplyKey(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send('message'); } }
   function autogrow(e) { const t = e.target; t.style.height = 'auto'; t.style.height = Math.min(160, t.scrollHeight) + 'px'; }
@@ -221,6 +239,21 @@
         <div class="compact-cta">
           <div class="cc-txt"><b>Good moment to compact.</b> This session is parked at {pct(ctxPct)} context — compacting now summarizes the conversation and frees tokens (cuts the cache-read you pay every later turn) before the next task.</div>
           <button class="cc-btn" onclick={compactNow} title="Types /compact into this session's window">🗜 Compact now</button>
+        </div>
+      {/if}
+
+      {#if procs.length}
+        <div class="sec">
+          <div class="lbl">⚙ Left running by this session <span class="dim2">· {procs.length}</span></div>
+          {#each procs as p (p.pid)}
+            <div class="proc">
+              <span class="pn">{p.name}</span>
+              <span class="pp mono">pid {p.pid}</span>
+              {#each (p.ports || []) as port (port)}<span class="pport">:{port}</span>{/each}
+              <span class="pu mono">{upShort(p.uptimeMs)}</span>
+              <button class="pk" onclick={() => killProc(p)} title={p.cmd}>Kill</button>
+            </div>
+          {/each}
         </div>
       {/if}
 
@@ -333,6 +366,14 @@
   .compact-cta .cc-btn { flex-shrink: 0; padding: 6px 12px; border-radius: 6px; cursor: pointer;
     background: #F59E0B; border: none; color: #1a1a1a; font-size: 12px; font-weight: 600; }
   .compact-cta .cc-btn:hover { opacity: 0.88; }
+  .proc { display: flex; align-items: center; gap: 7px; margin-top: 5px; }
+  .proc .pn { font-size: 12px; font-weight: 600; color: var(--color-text-primary); }
+  .proc .pp { font-size: 10px; color: var(--color-text-tertiary); }
+  .proc .pport { font-size: 10px; font-family: var(--font-mono); padding: 1px 6px; border-radius: 999px; background: #10B9811a; color: #10B981; }
+  .proc .pu { font-size: 10px; color: var(--color-text-tertiary); margin-left: auto; }
+  .proc .pk { flex-shrink: 0; padding: 2px 9px; border-radius: 5px; cursor: pointer; font-size: 11px; font-weight: 600;
+    background: #EF44441a; border: 0.5px solid #EF444455; color: #EF4444; }
+  .proc .pk:hover { background: #EF4444; color: #fff; }
   .logs { margin: 0; padding-left: 16px; font-family: var(--font-mono); font-size: 10px; color: var(--color-text-secondary); }
   .chips { flex-direction: row; flex-wrap: wrap; gap: 6px; }
   .chip { font-size: 10px; background: var(--color-background-secondary); border: 0.5px solid var(--color-border-tertiary);

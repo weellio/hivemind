@@ -1167,6 +1167,85 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (url === '/api/processes' && req.method === 'GET') {
+    if (process.platform !== 'win32') return sendJson(res, 200, { processes: [], note: 'process inspection is Windows-only for now' });
+    execFile('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(SCRIPTS_DIR, 'list-procs.ps1')],
+      { timeout: 12000, windowsHide: true, maxBuffer: 12e6 }, (err, stdout) => {
+        let data = { procs: [] };
+        try { data = JSON.parse(String(stdout || '{}')); } catch (_) {}
+        const all = Array.isArray(data.procs) ? data.procs : [];
+
+        // child adjacency, for walking a session window's descendant tree
+        const children = new Map();
+        for (const p of all) { if (!children.has(p.ppid)) children.set(p.ppid, []); children.get(p.ppid).push(p.pid); }
+        const descendants = (root) => {
+          const out = new Set(); const stack = [root];
+          while (stack.length) { const x = stack.pop(); for (const ch of (children.get(x) || [])) { if (!out.has(ch)) { out.add(ch); stack.push(ch); } } }
+          return out;
+        };
+        // each launched session's window pid → its descendant pids
+        const sess = [];
+        for (const a of agents.values()) {
+          if (!a.root || !a.cwd) continue;
+          const w = sessionWindows.get(projKeyOf(a.cwd));
+          if (w) sess.push({ sid: a.sessionId || String(a.id).replace(/^sess:/, ''), project: a.project, set: descendants(w.pid) });
+        }
+        const knownProjects = [];
+        for (const a of agents.values()) if (a.cwd) knownProjects.push({ cwd: String(a.cwd).toLowerCase(), project: a.project, sid: a.sessionId || String(a.id).replace(/^sess:/, '') });
+
+        // "interesting" = the kind of thing Claude spawns from Bash and leaves open
+        const INTERESTING = /^(node|python\d?|pythonw|py|deno|bun|npm|pnpm|yarn|vite|nodemon|next|ts-node|tsx|electron|webpack|esbuild|rollup|jest|vitest|gunicorn|uvicorn|flask|rails|ruby|go|dotnet|java|php|cargo|http-server|serve|ngrok)(\.exe)?$/i;
+        const now = Date.now();
+        const out = [];
+        for (const p of all) {
+          if (p.pid === process.pid) continue;                          // never list Hivemind's own bridge
+          const name = String(p.name || '');
+          const interesting = INTERESTING.test(name);
+          let attribution = 'orphan', sid = null, project = null;
+          for (const s of sess) { if (s.set.has(p.pid)) { attribution = 'session'; sid = s.sid; project = s.project; break; } }
+          if (attribution !== 'session' && interesting) {
+            const cmd = String(p.cmd || '').toLowerCase();
+            const hit = knownProjects.find((k) => k.cwd && cmd.includes(k.cwd));
+            if (hit) { attribution = 'project'; sid = hit.sid; project = hit.project; }
+          }
+          // drop system/service noise: a non-interesting process only shows if it's
+          // provably a descendant of a Claude session window.
+          if (!interesting && attribution !== 'session') continue;
+          // PowerShell's ConvertTo-Json unwraps a single-element array to a scalar and
+          // an empty one to {} — coerce both back to a clean array.
+          const ports = Array.isArray(p.ports) ? p.ports : (p.ports != null && typeof p.ports !== 'object' ? [p.ports] : []);
+          out.push({
+            pid: p.pid, name, cmd: p.cmd, ports,
+            started: p.started, uptimeMs: p.started ? Math.max(0, now - Date.parse(p.started)) : null,
+            attribution, sessionId: sid, project,
+          });
+        }
+        out.sort((a, b) => (b.ports.length - a.ports.length) || ((b.uptimeMs || 0) - (a.uptimeMs || 0)));
+        sendJson(res, 200, { processes: out, generatedAt: new Date().toISOString() });
+      });
+    return;
+  }
+
+  if (url === '/api/kill-process' && req.method === 'POST') {
+    const body = await readBody(req);
+    const pid = Number(body && body.pid);
+    if (!Number.isInteger(pid) || pid <= 4) return sendJson(res, 400, { error: 'invalid pid' });
+    if (pid === process.pid) return sendJson(res, 400, { error: "refusing to kill Hivemind's own bridge process" });
+    if (process.platform === 'win32') {
+      execFile('taskkill', ['/PID', String(pid), '/T', '/F'], { timeout: 8000, windowsHide: true }, (err, stdout, stderr) => {
+        const out = (String(stdout || '') + String(stderr || '')).trim();
+        const ok = /SUCCESS/i.test(out) || (!err && !/not found|no running/i.test(out));
+        console.log(`[kill] pid ${pid} -> ${ok ? 'ok' : 'fail'}`);
+        sendJson(res, 200, { ok, output: out });
+      });
+    } else {
+      execFile('kill', ['-TERM', String(pid)], { timeout: 8000 }, (err, stdout, stderr) => {
+        sendJson(res, 200, { ok: !err, output: (String(stdout || '') + String(stderr || '')).trim() });
+      });
+    }
+    return;
+  }
+
   if (url === '/api/drop-image' && req.method === 'POST') {
     const body = await readBodyLarge(req);
     if (!body || !body.dataUrl || !body.sessionId) return sendJson(res, 400, { error: 'sessionId and dataUrl required' });

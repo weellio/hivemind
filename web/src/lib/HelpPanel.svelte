@@ -46,6 +46,7 @@
         ['Session history', 'Recent sessions across all projects with their first prompt — View the transcript or ▶ Resume any one.'],
         ['Search', 'Search across every session transcript + project — find which session touched a file or topic, then open it.'],
         ['Activity feed', 'A live chronological ticker of agent events, with an errors-only filter to spotlight failures.'],
+        ['Processes (stuck open?)', 'Long-running / port-holding processes your sessions spawned (dev servers, node, python…). Spot one left running and Kill it (force-kills the tree). Each agent’s modal also lists what that session left open. Windows-only for now.'],
         ['Health / status', 'Confirm Hivemind is wired up: bridge uptime/events, hook-install checklist, node/platform.'],
       ],
     },
