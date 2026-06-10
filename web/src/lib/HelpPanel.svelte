@@ -21,6 +21,7 @@
         ['Reply · Stop', 'Send a message or task to a running session, or stop it at its next tool.'],
         ['💰 Session cost', 'Live estimated spend for that session.'],
         ['📄 Transcript', 'Read the full conversation of the session.'],
+        ['🪟 Focus window', 'Bring the running session’s terminal to the front — Hivemind raises the exact window it captured at launch (▶ Start / ＋ New task). Different from “Open in VS Code”, which opens the project folder.'],
         ['Open folder · VS Code', 'Jump to the project on disk or in your editor.'],
       ],
     },

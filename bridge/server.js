@@ -1150,6 +1150,23 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (url === '/api/focus-window' && req.method === 'POST') {
+    const body = await readBody(req);
+    if (!body || !body.sessionId) return sendJson(res, 400, { error: 'sessionId required' });
+    if (process.platform !== 'win32') return sendJson(res, 200, { ok: false, found: false, error: 'bringing a session window to the front is Windows-only for now' });
+    // Raise the running session's terminal — different from "Open in VS Code" (which
+    // opens the project folder): this jumps to the live window captured at launch.
+    const root = agents.get('sess:' + body.sessionId) || Array.from(agents.values()).find((a) => a.sessionId === body.sessionId);
+    const match = (root && root.project) || String(body.sessionId);
+    const win = root && root.cwd ? sessionWindows.get(projKeyOf(root.cwd)) : null;
+    const args = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(SCRIPTS_DIR, 'focus-window.ps1'), '-Match', match, ...(win ? ['-WinPid', String(win.pid)] : [])];
+    execFile('powershell', args, { timeout: 8000, windowsHide: true }, (err, stdout) => {
+      const found = !/no window for/i.test(String(stdout || ''));
+      sendJson(res, 200, { ok: true, found, hadPid: !!win });
+    });
+    return;
+  }
+
   if (url === '/api/drop-image' && req.method === 'POST') {
     const body = await readBodyLarge(req);
     if (!body || !body.dataUrl || !body.sessionId) return sendJson(res, 400, { error: 'sessionId and dataUrl required' });

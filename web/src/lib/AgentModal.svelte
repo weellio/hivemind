@@ -106,6 +106,19 @@
     if (!agent || !agent.cwd) return;
     try { await fetch('/api/open', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cwd: agent.cwd, target }) }); } catch (_) {}
   }
+  // Bring the running session's terminal window to the front (uses the window PID
+  // captured at launch). Different from "Open in VS Code", which opens the folder.
+  async function focusWindow() {
+    if (!agent) return;
+    const sid = agent.sessionId || String(agent.id).replace(/^sess:/, '');
+    try {
+      const r = await fetch('/api/focus-window', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: sid }) });
+      const j = await r.json();
+      if (j && j.ok && j.found) showFlash('🪟 brought the session window to the front');
+      else if (j && j.ok) showFlash("✗ couldn't find this session's window — launch it from Hivemind (▶ Start / ＋ New task) so the window can be captured.");
+      else showFlash('✗ ' + ((j && j.error) || 'failed'));
+    } catch (_) { showFlash('✗ Failed — is the bridge running?'); }
+  }
   // type a keystroke into the session's terminal window — answers interactive
   // numbered prompts / y-n / arrow menus that the message queue can't reach.
   async function sendKey(keys) {
@@ -180,6 +193,7 @@
       {#if agent.cwd || sid}
         <div class="actions">
           {#if sid}<button class="select" onclick={() => (txId = sid)}>📄 Transcript</button>{/if}
+          {#if agent.winPid}<button class="select" onclick={focusWindow} title="Bring this session's terminal window to the front (the window Hivemind captured when it launched)">🪟 Focus window</button>{/if}
           {#if agent.cwd}<button class="select" onclick={() => openIn('folder')}>📂 Open folder</button>{/if}
           {#if agent.cwd}<button class="select" onclick={() => openIn('editor')}>Open in VS Code</button>{/if}
         </div>
