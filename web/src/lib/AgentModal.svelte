@@ -3,6 +3,7 @@
   import { STATE_COLORS, STATE_LABEL } from './states.js';
   import { costAlerts } from './stores.js';
   import { readFile, downscale } from './img.js';
+  import MicButton from './MicButton.svelte';
   import TranscriptPanel from './TranscriptPanel.svelte';
 
   let { id, onClose } = $props();
@@ -209,6 +210,7 @@
       <div class="reply" class:drag={dropActive} ondrop={onDrop} ondragover={onDragOver} ondragleave={onDragLeave} role="group">
         <textarea bind:value={msg} rows="1" placeholder="reply / send a task…  (Enter sends · Shift+Enter newline · drop/paste an image)" onkeydown={onReplyKey} oninput={autogrow} onpaste={onPaste}></textarea>
         <div class="rbtns">
+          <MicButton onappend={(t) => (msg = (msg ? msg.trim() + ' ' : '') + t)} />
           <button class="act" disabled={busy === 'message'} onclick={() => send('message')}>{busy === 'message' ? 'Sending…' : (pendingImage ? 'Send 🖼' : 'Send')}</button>
           <button class="act stop" disabled={busy === 'stop'} onclick={() => send('stop')}>{busy === 'stop' ? 'Stopping…' : 'Stop'}</button>
         </div>

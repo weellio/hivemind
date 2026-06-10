@@ -1,4 +1,5 @@
 <script>
+  import MicButton from './MicButton.svelte';
   let { open = $bindable(false) } = $props();
   let projects = $state([]);
   let cwd = $state('');
@@ -47,7 +48,7 @@
   <div class="modal" role="dialog" aria-label="New task">
     <div class="hd"><strong>＋ New task</strong><button class="x" onclick={close} aria-label="Close">✕</button></div>
     <div class="body">
-      <label class="lbl">Goal <span class="sub">— what should Claude do?</span></label>
+      <div class="lblrow"><label class="lbl">Goal <span class="sub">— what should Claude do?</span></label><MicButton onappend={(t) => (goal = (goal ? goal.trim() + ' ' : '') + t)} /></div>
       <textarea bind:this={box} bind:value={goal} rows="3" placeholder="e.g. add a dark-mode toggle to the settings page and wire it to the theme store" onkeydown={onKey}></textarea>
       <label class="lbl">Project</label>
       {#if projects.length}
@@ -75,7 +76,9 @@
   .hd { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 0.5px solid var(--color-border-tertiary); }
   .x { background: none; border: none; cursor: pointer; font-size: 14px; color: var(--color-text-tertiary); }
   .body { padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+  .lblrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; }
   .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-tertiary); margin-top: 4px; }
+  .lblrow .lbl { margin-top: 0; }
   .sub { text-transform: none; letter-spacing: 0; color: var(--color-text-tertiary); font-weight: 400; }
   textarea, .in { font-size: 13px; padding: 8px; border-radius: var(--border-radius-md); font-family: inherit;
     border: 0.5px solid var(--color-border-tertiary); background: var(--color-background-secondary); color: var(--color-text-primary); box-sizing: border-box; width: 100%; }

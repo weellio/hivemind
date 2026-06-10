@@ -1,5 +1,6 @@
 <script>
   import { ttsAvailable, speak, stopSpeaking } from './tts.js';
+  import MicButton from './MicButton.svelte';
   let { open = $bindable(false) } = $props();
   let speakingId = $state(null);
   function listen(b) {
@@ -98,6 +99,7 @@
             {#each projects as p (p.path)}<option value={p.path}>{p.name}</option>{/each}
           </select>
           <textarea class="in ta" placeholder="prompt — what should Claude do? It can use skills & MCP, e.g. 'use my news skill + Gmail/Calendar MCP and compile a morning briefing'" bind:value={editing.prompt}></textarea>
+          <div class="microw"><MicButton onappend={(t) => (editing.prompt = (editing.prompt ? editing.prompt.trim() + ' ' : '') + t)} /> <span class="dim">dictate the prompt</span></div>
           <div class="frow">
             <label>Schedule <input class="in sm" placeholder="HH:MM or blank" bind:value={editing.schedule} /></label>
             <label>Permissions
@@ -179,6 +181,7 @@
   .form-h { font-size: 11px; font-weight: 600; }
   .in { font-size: 12px; padding: 6px 8px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-tertiary); background: var(--color-background-primary); color: var(--color-text-primary); box-sizing: border-box; width: 100%; font-family: inherit; }
   .ta { min-height: 80px; resize: vertical; line-height: 1.4; }
+  .microw { display: flex; align-items: center; gap: 7px; font-size: 10px; color: var(--color-text-tertiary); }
   .sm { width: 90px; }
   .frow { display: flex; gap: 10px; flex-wrap: wrap; }
   .frow label { font-size: 10px; color: var(--color-text-tertiary); display: flex; flex-direction: column; gap: 3px; }
