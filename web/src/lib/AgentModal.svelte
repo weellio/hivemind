@@ -2,12 +2,15 @@
   import { onMount } from 'svelte';
   import { STATE_COLORS, STATE_LABEL } from './states.js';
   import { costAlerts } from './stores.js';
+  import { readFile, downscale } from './img.js';
   import TranscriptPanel from './TranscriptPanel.svelte';
 
   let { id, onClose } = $props();
   let agent = $state(null);
   let info = $state(null);
   let msg = $state('');
+  let pendingImage = $state(null);   // { dataUrl, name } — dropped/pasted image to ask about
+  let dropActive = $state(false);
   let cost = $state(null);
   let gh = $state(null);
   let txId = $state(null);
@@ -55,10 +58,38 @@
     clearTimeout(flashTimer);
     flashTimer = setTimeout(() => { flash = ''; }, 2200);
   }
+  async function attachImage(f) {
+    if (!f || !/^image\//.test(f.type)) return;
+    try { const raw = await readFile(f); const ds = (await downscale(raw, 1600)) || raw; pendingImage = { dataUrl: ds, name: f.name || 'pasted.png' }; }
+    catch (_) { showFlash('✗ Could not read that image'); }
+  }
+  function onDrop(e) { e.preventDefault(); dropActive = false; const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (f) attachImage(f); }
+  function onDragOver(e) { if (Array.from((e.dataTransfer && e.dataTransfer.items) || []).some((i) => i.kind === 'file')) { e.preventDefault(); dropActive = true; } }
+  function onDragLeave() { dropActive = false; }
+  function onPaste(e) {
+    for (const it of (e.clipboardData && e.clipboardData.items) || []) {
+      if (it.type && it.type.startsWith('image/')) { const f = it.getAsFile(); if (f) { e.preventDefault(); attachImage(f); break; } }
+    }
+  }
+
   async function send(type) {
     if (!agent || busy) return;
-    if (type === 'message' && !msg.trim()) { showFlash('⚠ type a message first'); return; }
     const sid = agent.sessionId || String(agent.id).replace(/^sess:/, '');
+    if (type === 'message' && pendingImage) {
+      busy = type;
+      try {
+        const r = await fetch('/api/drop-image', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: sid, cwd: agent.cwd, dataUrl: pendingImage.dataUrl, name: pendingImage.name, text: msg }),
+        });
+        const j = await r.json();
+        if (j && j.ok) { showFlash('🖼 Image sent — Claude will Read it on next check-in'); msg = ''; pendingImage = null; }
+        else showFlash('✗ ' + ((j && j.error) || 'failed'));
+      } catch (_) { showFlash('✗ Failed — is the bridge running?'); }
+      finally { busy = ''; }
+      return;
+    }
+    if (type === 'message' && !msg.trim()) { showFlash('⚠ type a message first'); return; }
     busy = type;
     try {
       const r = await fetch('/api/command', {
@@ -131,15 +162,23 @@
         </div>
       {/if}
 
-      <div class="reply">
-        <textarea bind:value={msg} rows="1" placeholder="reply / send a task…  (Enter to send · Shift+Enter for a new line)" onkeydown={onReplyKey} oninput={autogrow}></textarea>
+      {#if pendingImage}
+        <div class="attach">
+          <img src={pendingImage.dataUrl} alt="attachment" />
+          <span class="atxt">{pendingImage.name} — ask about it below, then Send</span>
+          <button class="ax" title="Remove" onclick={() => (pendingImage = null)}>✕</button>
+        </div>
+      {/if}
+      <div class="reply" class:drag={dropActive} ondrop={onDrop} ondragover={onDragOver} ondragleave={onDragLeave} role="group">
+        <textarea bind:value={msg} rows="1" placeholder="reply / send a task…  (Enter sends · Shift+Enter newline · drop/paste an image)" onkeydown={onReplyKey} oninput={autogrow} onpaste={onPaste}></textarea>
         <div class="rbtns">
-          <button class="act" disabled={busy === 'message'} onclick={() => send('message')}>{busy === 'message' ? 'Sending…' : 'Send'}</button>
+          <button class="act" disabled={busy === 'message'} onclick={() => send('message')}>{busy === 'message' ? 'Sending…' : (pendingImage ? 'Send 🖼' : 'Send')}</button>
           <button class="act stop" disabled={busy === 'stop'} onclick={() => send('stop')}>{busy === 'stop' ? 'Stopping…' : 'Stop'}</button>
         </div>
+        {#if dropActive}<div class="dropmask">Drop image to ask about it</div>{/if}
       </div>
       {#if flash}<div class="flash" class:err={flash[0] === '✗' || flash[0] === '⚠'}>{flash}</div>{/if}
-      <div class="foot">Replies are delivered when the agent next checks in. “Stop” halts it at its next tool.</div>
+      <div class="foot">Replies deliver when the agent next checks in. “Stop” halts it at its next tool. Drop/paste an image and Claude saves + Reads it.</div>
     {:else}
       <div class="dim" style="padding:8px 4px">Agent not found — it may have finished.</div>
       <button onclick={onClose}>Close</button>
@@ -181,7 +220,16 @@
   .chips { flex-direction: row; flex-wrap: wrap; gap: 6px; }
   .chip { font-size: 10px; background: var(--color-background-secondary); border: 0.5px solid var(--color-border-tertiary);
     border-radius: 99px; padding: 3px 8px; color: var(--color-text-secondary); }
-  .reply { display: flex; gap: 6px; align-items: flex-end; }
+  .attach { display: flex; align-items: center; gap: 8px; padding: 5px; border-radius: 8px;
+    background: var(--color-background-secondary); border: 0.5px solid var(--color-border-tertiary); }
+  .attach img { width: 40px; height: 40px; object-fit: cover; border-radius: 5px; flex-shrink: 0; }
+  .atxt { font-size: 10px; color: var(--color-text-secondary); flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ax { background: none; border: none; cursor: pointer; color: var(--color-text-tertiary); font-size: 12px; }
+  .reply { position: relative; display: flex; gap: 6px; align-items: flex-end; border-radius: var(--border-radius-md); }
+  .reply.drag { outline: 2px dashed var(--accent, #6366F1); outline-offset: 3px; }
+  .dropmask { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none;
+    background: color-mix(in srgb, var(--accent, #6366F1) 14%, var(--color-background-primary)); border-radius: var(--border-radius-md);
+    font-size: 12px; font-weight: 600; color: var(--accent, #6366F1); }
   .reply textarea { flex: 1 1 auto; min-width: 0; font-size: 12px; padding: 6px 8px; font-family: inherit;
     line-height: 1.4; resize: none; overflow-y: auto; max-height: 160px;
     border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md);

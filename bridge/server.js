@@ -716,6 +716,15 @@ function readBody(req) {
     });
   });
 }
+// Larger-limit reader for image uploads (base64 data URLs are big).
+function readBodyLarge(req, maxBytes = 14e6) {
+  return new Promise((resolve) => {
+    let data = '';
+    req.on('data', (c) => { data += c; if (data.length > maxBytes) { try { req.destroy(); } catch (_) {} resolve(null); } });
+    req.on('end', () => { try { resolve(data ? JSON.parse(data) : {}); } catch { resolve(null); } });
+    req.on('error', () => resolve(null));
+  });
+}
 
 // ── Server ──────────────────────────────────────────────────────────────────
 const server = http.createServer(async (req, res) => {
@@ -1036,6 +1045,31 @@ const server = http.createServer(async (req, res) => {
     const r = projects.writeComponent(body.cwd, body.path, body.content);
     if (!r.error) console.log(`[edit] ${body.path}`);
     return sendJson(res, r.error ? 400 : 200, r);
+  }
+
+  if (url === '/api/drop-image' && req.method === 'POST') {
+    const body = await readBodyLarge(req);
+    if (!body || !body.dataUrl || !body.sessionId) return sendJson(res, 400, { error: 'sessionId and dataUrl required' });
+    const m = /^data:image\/([a-zA-Z0-9.+-]+);base64,(.+)$/.exec(String(body.dataUrl));
+    if (!m) return sendJson(res, 400, { error: 'not a base64 image data URL' });
+    const ext = ({ 'jpeg': 'jpg', 'svg+xml': 'svg' }[m[1].toLowerCase()] || m[1].toLowerCase()).replace(/[^a-z0-9]/g, '') || 'png';
+    let buf; try { buf = Buffer.from(m[2], 'base64'); } catch (_) { return sendJson(res, 400, { error: 'bad base64' }); }
+    if (buf.length > 16e6) return sendJson(res, 400, { error: 'image too large' });
+    const cwd = body.cwd && fs.existsSync(body.cwd) ? body.cwd : null;
+    const dir = cwd ? path.join(cwd, '.hivemind', 'drops') : path.join(os.tmpdir(), 'hivemind-drops');
+    if (cwd) { const safeRoot = path.resolve(path.join(cwd, '.hivemind')); if (!path.resolve(dir).startsWith(safeRoot)) return sendJson(res, 400, { error: 'bad path' }); }
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      if (cwd) { const gi = path.join(cwd, '.hivemind', '.gitignore'); if (!fs.existsSync(gi)) { try { fs.writeFileSync(gi, '*\n'); } catch (_) {} } }   // keep drops out of git
+      const safe = String(body.name || 'image').replace(/\.[a-z0-9]{2,4}$/i, '').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 40) || 'image';
+      const file = path.join(dir, `${Date.now()}-${safe}.${ext}`);
+      fs.writeFileSync(file, buf);
+      const q = String(body.text || '').trim();
+      const instr = `${q ? q + '\n\n' : ''}[Image attached via Hivemind] Open and look at this image with your Read tool:\n${file}`;
+      queueCommand(body.sessionId, 'message', instr);
+      maybeNudge();
+      return sendJson(res, 200, { ok: true, path: file });
+    } catch (e) { return sendJson(res, 500, { error: e.message }); }
   }
 
   if (url === '/api/component-generate' && req.method === 'POST') {
