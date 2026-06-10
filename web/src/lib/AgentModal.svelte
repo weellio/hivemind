@@ -147,6 +147,14 @@
       </div>
       {#if agent.cwd}<div class="path mono">{agent.cwd}</div>{/if}
 
+      {#if agent.state === 'awaiting'}
+        <div class="await">
+          <div class="await-h">🔔 Waiting on you</div>
+          <div class="await-msg">{agent.awaitMsg || 'Claude is waiting for your input.'}</div>
+          <div class="await-note">The exact menu lives in the terminal — Hivemind can't read it. Open it (<b>Open in VS Code</b>) to see the options, then answer with the keys below (e.g. <b>1</b> = first option, <b>y</b>/<b>n</b>, <b>↵</b>).</div>
+        </div>
+      {/if}
+
       <div class="sec">
         <div class="lbl">Current task / last message</div>
         {#if agent.lastMessage}<div class="lm">{agent.lastMessage}</div>{:else}<div class="dim">No captured message yet (appears after the agent finishes a turn).</div>{/if}
@@ -277,6 +285,11 @@
   .burn { color: #EF4444; font-weight: 600; }
   .foot { font-size: 10px; color: var(--color-text-tertiary); }
   .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .await { border: 0.5px solid #F59E0B; background: color-mix(in srgb, #F59E0B 10%, var(--color-background-secondary));
+    border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; }
+  .await-h { font-size: 11px; font-weight: 700; color: #B7791F; }
+  .await-msg { font-size: 12px; color: var(--color-text-primary); white-space: pre-wrap; }
+  .await-note { font-size: 10px; color: var(--color-text-tertiary); line-height: 1.45; }
   .keys { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 7px 9px; border-radius: 8px;
     background: var(--color-background-secondary); border: 0.5px solid var(--color-border-tertiary); }
   .keys.awaiting { border-color: #F59E0B; background: color-mix(in srgb, #F59E0B 10%, var(--color-background-secondary)); }

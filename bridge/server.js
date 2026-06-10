@@ -400,6 +400,7 @@ function upsert(ev) {
   if (ev.shirt !== undefined) existing.shirt = ev.shirt;
   if (ev.color !== undefined) existing.color = ev.color;   // agent's defined front-matter color
   if (ev.model !== undefined) existing.model = ev.model;   // agent's defined model
+  if (ev.awaitMsg !== undefined) existing.awaitMsg = ev.awaitMsg;   // why it's waiting on you
   if (ev.parentId !== undefined) existing.parentId = String(ev.parentId);
   if (ev.project !== undefined) existing.project = ev.project;
   if (ev.sessionId !== undefined) existing.sessionId = ev.sessionId;
@@ -683,7 +684,8 @@ function mapHookToEvents(p) {
     case 'Notification': {
       const kind = String(p.message || p.notification_type || p.type || '').toLowerCase();
       if (/auth|success|login/.test(kind)) return [];   // not an input request
-      return [{ ...base, agentId: rootId, root: true, name: project, state: 'awaiting', log: (p.message ? String(p.message) : 'awaiting input').slice(0, 80) }];
+      const reason = p.message ? String(p.message) : 'Claude is waiting for your input';
+      return [{ ...base, agentId: rootId, root: true, name: project, state: 'awaiting', log: reason.slice(0, 80), awaitMsg: reason.slice(0, 200) }];
     }
     case 'Stop':
       return [{ ...base, agentId: rootId, root: true, name: project, state: 'idle', log: 'turn complete', lastMessage: p._lastMessage }];
