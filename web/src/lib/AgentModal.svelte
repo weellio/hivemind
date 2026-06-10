@@ -19,6 +19,13 @@
   let busy = $state('');
   let flashTimer;
   let sid = $derived(agent ? (agent.sessionId || String(agent.id).replace(/^sess:/, '')) : '');
+  // Context-fill gauge: latest turn's context ÷ model limit. Claude Code auto-compacts
+  // near the limit, so a high % on a parked session is the moment to compact by hand.
+  let ctxPct = $derived(cost && typeof cost.ctxPct === 'number' ? cost.ctxPct : null);
+  let parked = $derived(agent && ['idle', 'done', 'awaiting'].includes(agent.state));
+  let compactReady = $derived(ctxPct !== null && ctxPct >= 0.7 && parked);
+  function pct(x) { return Math.round((x || 0) * 100) + '%'; }
+  function ctxColor(p) { return p >= 0.85 ? '#EF4444' : p >= 0.7 ? '#F59E0B' : '#10B981'; }
 
   async function refresh() {
     try {
@@ -133,6 +140,20 @@
       else showFlash('✗ ' + ((j && j.error) || 'failed'));
     } catch (_) { showFlash('✗ Failed — is the bridge running?'); }
   }
+  // Type "/compact" into the session's window — summarizes the conversation so far,
+  // freeing context (and cutting the cache-read you pay on every later turn). Best
+  // run on a parked session between tasks; mid-turn it would interrupt the work.
+  async function compactNow() {
+    if (!agent) return;
+    const s = agent.sessionId || String(agent.id).replace(/^sess:/, '');
+    try {
+      const r = await fetch('/api/sendkeys', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: s, keys: '/compact{ENTER}' }) });
+      const j = await r.json();
+      if (j && j.ok && j.found) showFlash('🗜 /compact sent — summarizing context to free tokens');
+      else if (j && j.ok) showFlash("✗ couldn't reach this session's window — launch it from Hivemind (▶ Start / ＋ New task) so it can be targeted.");
+      else showFlash('✗ ' + ((j && j.error) || 'failed'));
+    } catch (_) { showFlash('✗ Failed — is the bridge running?'); }
+  }
   function onKey(e) { if (e.key === 'Escape') onClose(); }
   function onReplyKey(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send('message'); } }
   function autogrow(e) { const t = e.target; t.style.height = 'auto'; t.style.height = Math.min(160, t.scrollHeight) + 'px'; }
@@ -175,6 +196,33 @@
         <div class="lbl">Current task / last message</div>
         {#if agent.lastMessage}<div class="lm">{agent.lastMessage}</div>{:else}<div class="dim">No captured message yet (appears after the agent finishes a turn).</div>{/if}
       </div>
+
+      {#if cost && (cost.tokens || ctxPct !== null)}
+        <div class="sec">
+          <div class="lbl">Analytics <span class="dim2">· estimated from transcript</span></div>
+          <div class="gauges">
+            {#if cost.tokens}<span class="g" title="Total tokens this session (input + output + cache)">🔢 {cost.tokens >= 1e6 ? (cost.tokens / 1e6).toFixed(1) + 'M' : Math.round(cost.tokens / 1000) + 'k'} tok</span>{/if}
+            {#if typeof cost.cacheHit === 'number'}<span class="g" title="Share of input-side tokens served from cache. Higher = more efficient (re-using context instead of re-sending it).">♻️ {pct(cost.cacheHit)} cache-hit</span>{/if}
+            {#if typeof cost.outShare === 'number'}<span class="g" title="Output's share of spend. Output costs ~5x input, so a high share means verbose answers — a candidate for a terse/shorthand skill.">🗣 {pct(cost.outShare)} output $</span>{/if}
+          </div>
+          {#if ctxPct !== null}
+            <div class="ctx">
+              <div class="ctx-top">
+                <span>Context window</span>
+                <span class="mono" style="color:{ctxColor(ctxPct)}">{pct(ctxPct)} of {Math.round((cost.ctxMax || 200000) / 1000)}k{ctxPct >= 0.85 ? ' · auto-compact soon' : ''}</span>
+              </div>
+              <div class="bar"><div class="fill" style="width:{Math.round(ctxPct * 100)}%;background:{ctxColor(ctxPct)}"></div></div>
+            </div>
+          {/if}
+        </div>
+      {/if}
+
+      {#if compactReady && agent.cwd}
+        <div class="compact-cta">
+          <div class="cc-txt"><b>Good moment to compact.</b> This session is parked at {pct(ctxPct)} context — compacting now summarizes the conversation and frees tokens (cuts the cache-read you pay every later turn) before the next task.</div>
+          <button class="cc-btn" onclick={compactNow} title="Types /compact into this session's window">🗜 Compact now</button>
+        </div>
+      {/if}
 
       {#if agent.logLines && agent.logLines.length}
         <div class="sec"><div class="lbl">Recent activity</div>
@@ -271,6 +319,20 @@
   .lm { font-size: 12.5px; line-height: 1.5; white-space: pre-wrap; background: var(--color-background-secondary);
     border-radius: 8px; padding: 10px; max-height: 46vh; overflow: auto; }
   .dim { font-size: 11px; color: var(--color-text-tertiary); }
+  .dim2 { color: var(--color-text-tertiary); font-weight: 400; text-transform: none; letter-spacing: 0; }
+  .gauges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px; }
+  .gauges .g { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: var(--color-background-secondary);
+    border: 0.5px solid var(--color-border-tertiary); color: var(--color-text-secondary); white-space: nowrap; }
+  .ctx { margin-top: 8px; }
+  .ctx-top { display: flex; justify-content: space-between; font-size: 11px; color: var(--color-text-secondary); margin-bottom: 3px; }
+  .bar { height: 6px; border-radius: 3px; background: var(--color-background-secondary); overflow: hidden; }
+  .bar .fill { height: 100%; border-radius: 3px; transition: width 0.4s ease; }
+  .compact-cta { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 9px 11px;
+    background: #F59E0B14; border: 0.5px solid #F59E0B55; border-radius: var(--border-radius-md, 8px); }
+  .compact-cta .cc-txt { flex: 1; font-size: 11.5px; line-height: 1.45; color: var(--color-text-secondary); }
+  .compact-cta .cc-btn { flex-shrink: 0; padding: 6px 12px; border-radius: 6px; cursor: pointer;
+    background: #F59E0B; border: none; color: #1a1a1a; font-size: 12px; font-weight: 600; }
+  .compact-cta .cc-btn:hover { opacity: 0.88; }
   .logs { margin: 0; padding-left: 16px; font-family: var(--font-mono); font-size: 10px; color: var(--color-text-secondary); }
   .chips { flex-direction: row; flex-wrap: wrap; gap: 6px; }
   .chip { font-size: 10px; background: var(--color-background-secondary); border: 0.5px solid var(--color-border-tertiary);

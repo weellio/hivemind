@@ -30,6 +30,18 @@ function rateFor(model) {
   return PRICING.sonnet; // default
 }
 
+// Context window (tokens) per model — for the "how full / near auto-compact" gauge.
+// Claude Code auto-compacts as the context approaches the model limit, so fill %
+// (latest turn's context size ÷ this) is a usable "compact soon" signal.
+function contextMaxFor(model, observed) {
+  // Current Claude models are 200k context; some offer a 1M beta window. We can't
+  // always tell the window from the id, so if a turn's observed context already
+  // exceeds 200k the session must be on the larger window — step up so the fill %
+  // stays meaningful instead of pinning at 100%.
+  if (observed && observed > 200000) return 1000000;
+  return 200000;
+}
+
 function costOf(model, input, output, cacheWrite, cacheRead) {
   const r = rateFor(model);
   return (
@@ -239,12 +251,29 @@ async function build() {
       // by session
       let s = sessions.get(sessionId);
       if (!s) {
-        s = { sessionId, project: cwd, tokens: 0, costUSD: 0, lastActive: null };
+        s = {
+          sessionId, project: cwd, tokens: 0, costUSD: 0, lastActive: null,
+          input: 0, output: 0, cacheWrite: 0, cacheRead: 0, outputCost: 0,
+          ctxTokens: 0, ctxModel: model, ctxTs: null,
+        };
         sessions.set(sessionId, s);
       }
       s.tokens += tokens;
       s.costUSD += cost;
+      s.input += input;
+      s.output += output;
+      s.cacheWrite += cacheWrite;
+      s.cacheRead += cacheRead;
+      s.outputCost += (output / 1e6) * rateFor(model).output;
       if (ts && (!s.lastActive || ts > s.lastActive)) s.lastActive = ts;
+      // Latest turn's context size = everything fed to the model that turn
+      // (fresh input + cache write + cache read). Tracks the most recent turn so
+      // ctxTokens reflects "how full is it right now", which drives the fill gauge.
+      if (!s.ctxTs || (ts && ts >= s.ctxTs)) {
+        s.ctxTs = ts;
+        s.ctxTokens = input + cacheWrite + cacheRead;
+        s.ctxModel = model;
+      }
     });
   }
 
@@ -288,9 +317,29 @@ async function build() {
     .sort((a, b) => b.costUSD - a.costUSD)
     .slice(0, 10);
 
-  // bySession — cost/tokens keyed by sessionId, for live per-agent lookup
+  // bySession — cost/tokens + efficiency gauges keyed by sessionId, for live
+  // per-agent lookup in the agent modal:
+  //   outShare  — output's share of spend (output is 5x input; high = verbose)
+  //   cacheHit  — fraction of input-side tokens served from cache (high = efficient)
+  //   ctxPct    — latest turn's context ÷ model limit (high = near auto-compact)
   const bySession = {};
-  for (const s of sessions.values()) bySession[s.sessionId] = { costUSD: s.costUSD, tokens: s.tokens };
+  for (const s of sessions.values()) {
+    const inputSide = s.input + s.cacheWrite + s.cacheRead;
+    const ctxMax = contextMaxFor(s.ctxModel, s.ctxTokens);
+    bySession[s.sessionId] = {
+      costUSD: s.costUSD,
+      tokens: s.tokens,
+      input: s.input,
+      output: s.output,
+      cacheWrite: s.cacheWrite,
+      cacheRead: s.cacheRead,
+      outShare: s.costUSD > 0 ? s.outputCost / s.costUSD : 0,
+      cacheHit: inputSide > 0 ? s.cacheRead / inputSide : 0,
+      ctxTokens: s.ctxTokens,
+      ctxMax,
+      ctxPct: ctxMax > 0 ? Math.min(1, s.ctxTokens / ctxMax) : 0,
+    };
+  }
 
   return {
     totals,
