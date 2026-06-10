@@ -95,6 +95,7 @@
         {#if agent.sessionId}<span class="mono">· {String(agent.sessionId).slice(0, 8)}</span>{/if}
         {#if agent.parentId}<span>· sub-agent</span>{/if}
         {#if agent.role}<span title="Agent type">· {agent.role}</span>{/if}
+        {#if agent.model && agent.model !== 'inherit'}<span title="Defined model">· 🧠 {agent.model}</span>{/if}
         {#if agent.updatedAt}<span class="mono" title="Time since last event">· ⏱ {rel(agent.updatedAt)}</span>{/if}
         {#if cost}<span class="mono" title="This session's estimated spend">· 💰 ${cost.costUSD.toFixed(2)}</span>{/if}
         {#if agent.runaway && $costAlerts}<span class="mono burn" title="Burning fast right now — consider Stop">· 💸 ${(agent.burnRate || 0).toFixed(2)}/min</span>{/if}

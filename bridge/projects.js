@@ -298,4 +298,42 @@ function newComponent(opts) {
   return { ok: true, path: fp, slug, warnings: v.warnings, content };
 }
 
-module.exports = { getConfig, addRoot, removeRoot, noteKnown, discover, project, copyComponent, keyOf, diffComponent, readComponent, writeComponent, newComponent, validateFrontMatter };
+// ── agent front-matter lookup (color + model) for the office visualization ─────
+const _agentMetaCache = new Map();   // cwd|slug -> { color?, model? }
+function parseFrontMatterKeys(text) {
+  const out = {};
+  const m = /^---\n([\s\S]*?)\n---/.exec(String(text || ''));
+  if (!m) return out;
+  for (const ln of m[1].split('\n')) {
+    const mm = /^([A-Za-z0-9_-]+):\s?(.*)$/.exec(ln);
+    if (mm) out[mm[1].toLowerCase()] = mm[2].replace(/^["']|["']$/g, '').trim();
+  }
+  return out;
+}
+// Resolve an agent_type to its defined color/model by reading the agent .md
+// (project first, then global ~/.claude). Cached; returns {} for built-ins.
+function agentMeta(cwd, name) {
+  if (!name) return {};
+  const slug = slugify(name);
+  if (!slug) return {};
+  const key = (cwd || '') + '|' + slug;
+  if (_agentMetaCache.has(key)) return _agentMetaCache.get(key);
+  const candidates = [];
+  if (cwd) { candidates.push(path.join(cwd, '.claude', 'agents', slug + '.md')); candidates.push(path.join(cwd, '.claude', 'agents', name + '.md')); }
+  candidates.push(path.join(os.homedir(), '.claude', 'agents', slug + '.md'));
+  let meta = {};
+  for (const f of candidates) {
+    try {
+      if (fs.existsSync(f)) {
+        const fm = parseFrontMatterKeys(fs.readFileSync(f, 'utf8'));
+        if (fm.color) meta.color = fm.color;
+        if (fm.model) meta.model = fm.model;
+        break;
+      }
+    } catch (_) {}
+  }
+  _agentMetaCache.set(key, meta);
+  return meta;
+}
+
+module.exports = { getConfig, addRoot, removeRoot, noteKnown, discover, project, copyComponent, keyOf, diffComponent, readComponent, writeComponent, newComponent, validateFrontMatter, agentMeta };

@@ -14,6 +14,8 @@ const CX = W / 2; // horizontal centre — the desk/figure are mirrored around t
 
 // ── palettes ────────────────────────────────────────────────────────────────
 const SHIRTS = ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EF4444', '#EC4899', '#06B6D4'];
+// Map an agent's front-matter `color` name to a shirt hex (matches the builder palette).
+const COLORMAP = { blue: '#3B82F6', green: '#10B981', red: '#EF4444', purple: '#8B5CF6', pink: '#EC4899', orange: '#F59E0B', cyan: '#06B6D4', yellow: '#EAB308' };
 const HAIRS = ['#3C2A1E', '#1F2937', '#5B3A29', '#6B4423', '#2D2D2D', '#7A4B2A', '#4A3020'];
 const SKIN = '#E8B89B';
 
@@ -196,7 +198,7 @@ export function paintFigure(ctx, agent, t, opts = {}) {
   const state = (agent && agent.state) || 'idle';
   const accent = STATE_COLORS[state] || STATE_COLORS.idle;
   const id = (agent && agent.id) || 'a';
-  const shirt = (agent && agent.shirt) || SHIRTS[hash(id) % SHIRTS.length];
+  const shirt = (agent && agent.shirt) || (agent && agent.color && COLORMAP[String(agent.color).toLowerCase()]) || SHIRTS[hash(id) % SHIRTS.length];
   const hair = HAIRS[hash(id + 'h') % HAIRS.length];
   const isError = state === 'error';
 

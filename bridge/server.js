@@ -394,6 +394,8 @@ function upsert(ev) {
     }
   }
   if (ev.shirt !== undefined) existing.shirt = ev.shirt;
+  if (ev.color !== undefined) existing.color = ev.color;   // agent's defined front-matter color
+  if (ev.model !== undefined) existing.model = ev.model;   // agent's defined model
   if (ev.parentId !== undefined) existing.parentId = String(ev.parentId);
   if (ev.project !== undefined) existing.project = ev.project;
   if (ev.sessionId !== undefined) existing.sessionId = ev.sessionId;
@@ -637,7 +639,7 @@ function mapHookToEvents(p) {
     case 'PostToolUse': {
       const id = sub ? subId : rootId;
       const out = [];
-      if (sub) out.push({ ...base, agentId: id, parentId: rootId, name: p.agent_type || ('sub-' + String(p.agent_id).slice(0, 6)) });
+      if (sub) out.push({ ...base, agentId: id, parentId: rootId, name: p.agent_type || ('sub-' + String(p.agent_id).slice(0, 6)), ...projects.agentMeta(p.cwd, p.agent_type) });
       else out.push({ ...base, agentId: id, root: true, name: project });
       out.push({ ...base, agentId: id, state: toolState(p.tool_name, p.tool_input), log: (p.tool_name || 'tool') + toolDetail(p) });
       return out;
@@ -645,13 +647,13 @@ function mapHookToEvents(p) {
     case 'PostToolUseFailure': {
       const id = sub ? subId : rootId;
       const out = [];
-      if (sub) out.push({ ...base, agentId: id, parentId: rootId, name: p.agent_type || ('sub-' + String(p.agent_id).slice(0, 6)) });
+      if (sub) out.push({ ...base, agentId: id, parentId: rootId, name: p.agent_type || ('sub-' + String(p.agent_id).slice(0, 6)), ...projects.agentMeta(p.cwd, p.agent_type) });
       else out.push({ ...base, agentId: id, root: true, name: project });
       out.push({ ...base, agentId: id, state: 'error', log: (p.tool_name || 'tool') + ' failed' });
       return out;
     }
     case 'SubagentStart':
-      return [{ ...base, agentId: subId, parentId: rootId, name: p.agent_type || 'subagent', state: 'spawning', log: 'subagent started' }];
+      return [{ ...base, agentId: subId, parentId: rootId, name: p.agent_type || 'subagent', state: 'spawning', log: 'subagent started', ...projects.agentMeta(p.cwd, p.agent_type) }];
     case 'SubagentStop':
       return [{ ...base, agentId: subId, state: 'done', log: 'subagent finished' }];
     case 'Notification': {

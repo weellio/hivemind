@@ -704,6 +704,12 @@
         ctx.textAlign = 'center';
         const lbl = agent.name && agent.name.length > 16 ? agent.name.slice(0, 15) + '…' : (agent.name || '');
         ctx.fillText(lbl, drawX, drawY + 50 * fs + 6);
+        // the agent's defined model (haiku/sonnet/opus), if any — small + dim under the name
+        if (agent.model && agent.model !== 'inherit') {
+          ctx.fillStyle = 'rgba(140,140,150,0.85)';
+          ctx.font = '8px ui-sans-serif, system-ui, sans-serif';
+          ctx.fillText(agent.model, drawX, drawY + 50 * fs + 16);
+        }
 
         // runaway burn badge — a bold red pill centered over the figure's chest, drawn
         // on top so it stands out instead of blending into the name/state text.
