@@ -21,6 +21,7 @@ It attaches to any project automatically via Claude Code **hooks** — no manual
 - **Office floor + Mosaic views** — a top-down animated office where agents walk, gather at the water cooler, and route packets to their sub-agents; or a compact responsive tile grid.
 - **3 avatar tiers** — pixel art (procedural Canvas), abstract (waveforms/EQ/rings), and top-down desk people / your own images.
 - **Click any agent** — a modal to read its current task, reply, stop it, or open its folder / VS Code.
+- **Live cost + runaway alerts** — each agent tile shows its session spend, and any agent burning money fast (a stuck/looping session) lights up red with a `💸 $/min` badge so you can catch it and stop it before it runs up a bill. Toggle off in Settings if you don't care about spend.
 
 ## Control center — manage Claude Code, not just watch it
 
@@ -32,6 +33,21 @@ Beyond visualization, Hivemind is a local control panel for everything Claude Co
 - **Config** — view a project's hooks, MCP servers, and raw `settings.json`; delete a hook event or MCP server.
 - **History** — recent sessions across all projects with their first prompt; **▶ Resume** any one (`claude --resume <id>` in a terminal) or copy the command.
 - **Telegram** — get pinged when a session is waiting on you, and reply or `/stop` from your phone.
+
+## Screenshots
+
+<p align="center"><img src="assets/Office_Swarm.jpg" width="840" alt="The Office floor view with multiple live sessions" /></p>
+<p align="center"><em>The Office floor — many live Claude Code sessions at once, each in its own room. Idle agents drift to the water cooler and clock out.</em></p>
+
+<p align="center">
+  <img src="assets/agentmodal.jpg" width="320" alt="Agent modal" />
+  &nbsp;
+  <img src="assets/perminute.jpg" width="400" alt="Runaway burn-rate detection on the floor" />
+</p>
+<p align="center"><em>Click any agent to read its task, reply, or stop it — with live $/min burn, a GitHub link, and open-in-VS-Code (left). An agent stuck in a retry loop lights up red with a 💸 $/min badge so you can catch it (right).</em></p>
+
+<p align="center"><img src="assets/usage.jpg" width="840" alt="Usage and cost panel" /></p>
+<p align="center"><em>Usage &amp; cost — real spend parsed from your <code>~/.claude</code> transcripts: total, 30-day chart, and per-project / per-session breakdowns.</em></p>
 
 ## Install
 
@@ -191,6 +207,8 @@ States: `idle · thinking · coding · spawning · reading · testing · error �
 - **Port** — `AOC_PORT` (default `3131`).
 - **Telegram alerts/replies** — `{ "telegramToken": "...", "telegramChatId": "...", "dashboardUrl": "..." }` (or `AOC_TG_TOKEN` / `AOC_TG_CHAT` / `AOC_DASH_URL`). For inbound replies, the bot must have no webhook — use a dedicated bot via `"telegramReplyToken"` if needed.
 - **Avatar images** — imported from the dashboard (**Images…** / **Action images…**), stored in the browser's localStorage.
+- **Runaway burn threshold** — `{ "burnAlert": 1.0 }` ($/min). Any active session spending faster than this gets the red "runaway" highlight (default `1.0`). The visual itself can be toggled per-browser in Settings → *Cost & burn alerts*.
+- **Claude command / path** — `{ "claudeCmd": "" }`. The **▶ Start** / Resume buttons run `claude` (on PATH) by default. If you get *"'claude' is not recognized"*, set this to the full path to the CLI — find it with `where claude` (Windows) / `which claude` (macOS/Linux), e.g. `C:\Users\you\.local\bin\claude.exe`. Also settable from Settings → *Claude command / path*.
 
 ## Support
 
