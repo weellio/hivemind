@@ -69,6 +69,7 @@ function RootIds { return @($sessions | ForEach-Object { $_.id }) }
 function Cleanup {
   # roots are kept-on-remove by the bridge; demote them first so they fully delete
   foreach ($s in $sessions) { ev @{ agentId = $s.id; root = $false } }
+  ev @{ agentId = 'broll-rogue'; root = $false }   # the runaway is a root too
   foreach ($id in (AllIds)) { RemoveAgent $id }
 }
 
@@ -171,23 +172,25 @@ function Scene3 {
 function Scene4 {
   Write-Host "`n=== SCENE 4: click an agent -> stop the rogue (slot 3) ===" -ForegroundColor Cyan
   Write-Host "Narration: 'that rabbit-hole session? stopped in one click.'"
-  Write-Host "DASHBOARD: grid or floor. CLICK the red rogue tile in WaivePulse's swarm,"
+  Write-Host "DASHBOARD: grid or floor. CLICK the red 'frontend' session (its own office),"
   Write-Host "           show its modal (cost + burn + last message), then press Stop."
   Pause "Get ready to record the click + Stop"
 
   BuildAll
-  # give a few workers modest live cost so numbers look real around the rogue
-  ev @{ agentId = 'broll-s1-w1'; state = 'reading'; costUSD = 0.42; burnRate = 0.10 }
-  ev @{ agentId = 'broll-s1-w2'; state = 'coding';  costUSD = 0.88; burnRate = 0.15 }
-  ev @{ agentId = 'broll-s2-w0'; state = 'testing'; costUSD = 0.31; burnRate = 0.08 }
-  # the rogue: a worker inside WaivePulse's swarm, BURNING money fast (burnRate over
-  # the $1/min threshold -> red runaway ring + 💸 badge), with a juicy last message.
-  ev @{ agentId = 'broll-rogue'; name = 'general-purpose'; parentId = 'broll-s1'; project = $proj; cwd = $repo;
-       state = 'coding'; costUSD = 12.40; burnRate = 7.80; runaway = $true;
+  # background life on the other sessions (sub-agents don't show cost -- only sessions do)
+  ev @{ agentId = 'broll-s1-w1'; state = 'reading' }
+  ev @{ agentId = 'broll-s1-w2'; state = 'coding' }
+  ev @{ agentId = 'broll-s2-w0'; state = 'testing' }
+  # The runaway is a SESSION (root) stuck in a retry loop. Cost/burn belong to a
+  # session, not a sub-agent, so this matches how the real product behaves: it shows
+  # as its own office, glowing red, $/min climbing. (~$7/min ~= a stuck Opus session
+  # at API list prices -- a believable demo number, not a wild one.)
+  ev @{ agentId = 'broll-rogue'; name = 'frontend'; root = $true; project = $proj; cwd = $repo;
+       state = 'coding'; costUSD = 8.20; burnRate = 7.40; runaway = $true;
        lastMessage = 'Retrying tool call (attempt 47): command timed out, re-running the same search again...';
        log = 'looping: re-running search (attempt 47)' }
 
-  Write-Host "[LIVE] Rogue is up in WaivePulse's swarm, glowing red and climbing." -ForegroundColor Green
+  Write-Host "[LIVE] A stuck session ('frontend') is glowing red, `$/min climbing." -ForegroundColor Green
   Write-Host "       Click it -> read the modal -> click Stop and it will CLOCK OUT on camera." -ForegroundColor Green
   Write-Host "       (Or press Enter to advance without stopping it.)" -ForegroundColor Green
   DrainKeys
@@ -199,17 +202,18 @@ function Scene4 {
   $stateUrl = "http://localhost:$Port/api/state"
   function StopCount { try { $s = Invoke-RestMethod -Uri $stateUrl -TimeoutSec 2; if ($s.pending) { $v = $s.pending.$rsid; if ($v) { return [int]$v } } } catch {}; return 0 }
   $baseStops = StopCount
-  $cost = 6.40
+  $cost = 8.20
   while (-not (EnterPressed)) {
     if ((StopCount) -gt $baseStops) {
-      ev @{ agentId = 'broll-rogue'; state = 'done'; burnRate = 0; log = 'stopped by you -- clocking out' }
-      Write-Host "[LIVE] Stop received -> rogue is clocking out. Re-run -Scene 4 for another take." -ForegroundColor Green
+      ev @{ agentId = 'broll-rogue'; state = 'done'; burnRate = 0; runaway = $false; log = 'stopped by you -- clocking out' }
+      Write-Host "[LIVE] Stop received -> session clocking out. Re-run -Scene 4 for another take." -ForegroundColor Green
       Start-Sleep -Seconds 2
+      ev @{ agentId = 'broll-rogue'; root = $false }   # demote so it can be fully removed
       RemoveAgent 'broll-rogue'
       break
     }
-    $cost = [math]::Round($cost + (Get-Random -Minimum 10 -Maximum 22) / 100.0, 2)
-    ev @{ agentId = 'broll-rogue'; state = 'coding'; costUSD = $cost; burnRate = (Get-Random -Minimum 700 -Maximum 920) / 100.0; runaway = $true }
+    $cost = [math]::Round($cost + (Get-Random -Minimum 8 -Maximum 16) / 100.0, 2)
+    ev @{ agentId = 'broll-rogue'; state = 'coding'; costUSD = $cost; burnRate = (Get-Random -Minimum 650 -Maximum 880) / 100.0; runaway = $true }
     # gentle background life across the other sessions
     ev @{ agentId = ((WorkerIds) | Get-Random); state = ($work | Get-Random) }
     Start-Sleep -Milliseconds 1300
