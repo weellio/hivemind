@@ -12,6 +12,31 @@ const os = require('os');
 const ROOT = path.resolve(__dirname, '..');
 const fwd = (p) => p.replace(/\\/g, '/');
 
+// Skills/agents Hivemind ships alongside the hooks. Copied into the same .claude
+// scope as the hooks (global ~/.claude or this project) so any session can use them.
+const COMPONENTS = [
+  { src: path.join(ROOT, 'skills', 'component-builder'), rel: ['skills', 'component-builder'] },
+  { src: path.join(ROOT, 'agents', 'component-smith.md'), rel: ['agents', 'component-smith.md'] },
+];
+function componentBase(opts) { return opts.project ? process.cwd() : os.homedir(); }
+function installComponents(opts) {
+  const base = componentBase(opts);
+  for (const c of COMPONENTS) {
+    if (!fs.existsSync(c.src)) continue;
+    const dest = path.join(base, '.claude', ...c.rel);
+    if (opts.dryRun) { console.log(`[dry-run] would copy ${fwd(c.src)} -> ${fwd(dest)}`); continue; }
+    try { fs.mkdirSync(path.dirname(dest), { recursive: true }); fs.cpSync(c.src, dest, { recursive: true }); } catch (_) {}
+  }
+  if (!opts.dryRun) console.log('✓ Installed Hivemind skill (component-builder) + agent (component-smith)');
+}
+function uninstallComponents(opts) {
+  const base = componentBase(opts);
+  for (const c of COMPONENTS) {
+    const dest = path.join(base, '.claude', ...c.rel);
+    try { if (fs.existsSync(dest)) fs.rmSync(dest, { recursive: true, force: true }); } catch (_) {}
+  }
+}
+
 // The hooks Hivemind installs. emit.js forwards events (and carries the command
 // return channel); launch.js starts the bridge + opens the dashboard once.
 function buildHooks() {
@@ -74,12 +99,14 @@ function install(opts) {
   if (opts.dryRun) {
     console.log(`[dry-run] would update ${sp} with hooks:`);
     console.log(JSON.stringify(settings.hooks, null, 2));
+    installComponents(opts);
     return;
   }
   backup(sp);
   writeJson(sp, settings);
   console.log(`✓ Installed Hivemind hooks into ${sp}`);
   console.log(`  scope: ${opts.project ? 'this project' : 'global (all sessions on this machine)'}`);
+  installComponents(opts);
 }
 
 function uninstall(opts) {
@@ -96,6 +123,7 @@ function uninstall(opts) {
   backup(sp);
   writeJson(sp, settings);
   console.log(`✓ Removed ${removed} Hivemind hook group(s) from ${sp}`);
+  uninstallComponents(opts);
 }
 
 module.exports = { install, uninstall, settingsPath, ROOT };
