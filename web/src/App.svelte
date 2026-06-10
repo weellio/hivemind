@@ -5,6 +5,7 @@
   import AgentTile from './lib/AgentTile.svelte';
   import AgentModal from './lib/AgentModal.svelte';
   import NewTask from './lib/NewTask.svelte';
+  import Tour from './lib/Tour.svelte';
   import ActionImages from './lib/ActionImages.svelte';
   import ProjectsSidebar from './lib/ProjectsSidebar.svelte';
   import CostPanel from './lib/CostPanel.svelte';
@@ -133,6 +134,16 @@
   let transcriptId = $state(null);
   let tileModalId = $state(null);   // mosaic tile → full agent modal
   let newTaskOpen = $state(false);  // ＋ New task launcher
+  let tourOpen = $state(false);     // first-run guided tour
+  const tourSteps = [
+    { title: '👋 Welcome to Hivemind', body: "Live mission control for your Claude Code agents — watch them work, manage every project, and kick off new tasks. Here's a 30-second tour." },
+    { sel: '[data-tour="newtask"]', title: '＋ New task', body: 'Kick off a goal from anywhere: type what you want, pick a project, and it launches a fresh Claude session working on it.' },
+    { sel: '[data-tour="layout"]', title: 'Two views', body: 'Office floor (agents walk around, gather at the cooler) or Mosaic (a tile per agent). Switch anytime — try both.' },
+    { sel: '[data-tour="manage"]', title: 'Control center', body: 'Projects, Usage & cost, GitHub, Session history, Telegram — manage Claude Code on your machine, not just watch it.' },
+    { sel: '[data-tour="settings"]', title: 'Make it yours', body: 'Personalize avatars, cost alerts, and New session options — e.g. skip permission prompts so you don\'t babysit launches. Set up Telegram to get pinged on your phone.' },
+    { sel: '[data-tour="status"]', title: 'Live pulse', body: "Today's and total spend, plus a live count of what every agent is doing." },
+    { title: "You're set 🎉", body: 'Click any agent to read its task, reply, stop it, or drop an image to ask about. Replay this tour anytime: press / and choose “Take the tour”.' },
+  ];
   let paletteOpen = $state(false);
   let focusReq = $state(null);
   function onGlobalKey(e) {
@@ -152,6 +163,7 @@
       { label: 'Activity feed', sub: 'panel', action: () => openP('feed') },
       { label: 'Health / status', sub: 'panel', action: () => openP('health') },
       { label: 'New task — start a session on a goal', sub: 'launch', action: () => (newTaskOpen = true) },
+      { label: 'Take the tour', sub: 'walkthrough', action: () => (tourOpen = true) },
       { label: 'Export swarm snapshot', sub: 'Mermaid + PNG', action: exportSnapshot },
       { label: $soundOn ? 'Mute alert sound' : 'Unmute alert sound', sub: 'toggle', action: () => ($soundOn = !$soundOn) },
       { label: 'Office floor view', sub: 'view', action: () => ($layout = 'office') },
@@ -175,6 +187,8 @@
     poll();
     pollUsage();
     fetch('/api/health').then((r) => r.json()).then((s) => (healthInfo = s)).catch(() => {});
+    // first-run guided tour (once per browser; replay from the command palette)
+    try { if (!localStorage.getItem('aoc-toured')) setTimeout(() => (tourOpen = true), 800); } catch (_) {}
     // auto-refresh cost only when enabled (re-parsing transcripts is disk-heavy)
     const uid = setInterval(() => { if ($autoUsage) pollUsage(); }, 60000);
     return () => clearInterval(uid);
@@ -288,7 +302,7 @@
     </div>
 
     <div class="controls">
-      <button class="newtask" onclick={() => (newTaskOpen = true)} title="Start a new Claude session on a goal">＋ New task</button>
+      <button class="newtask" data-tour="newtask" onclick={() => (newTaskOpen = true)} title="Start a new Claude session on a goal">＋ New task</button>
 
       <select class="select" value={selectedProject} onchange={pickProject} title="Projects with a live or recently-active session. To browse every project on disk, use Manage → Projects.">
         <option value="">All open projects ({agents.length})</option>
@@ -297,7 +311,7 @@
         {/each}
       </select>
 
-      <select class="select" bind:value={$layout}>
+      <select class="select" data-tour="layout" bind:value={$layout}>
         <option value="office">Office (floor)</option>
         <option value="mosaic">Mosaic</option>
       </select>
@@ -320,7 +334,7 @@
       <button class="select" onclick={() => (paletteOpen = true)} title="Command palette — jump to a panel or agent (press /)">🔍 Jump</button>
 
       <div class="menu-wrap">
-        <button class="select" onclick={() => { menuOpen = !menuOpen; optsOpen = false; }} title="Manage your Claude Code projects & sessions">⚙ Manage ▾</button>
+        <button class="select" data-tour="manage" onclick={() => { menuOpen = !menuOpen; optsOpen = false; }} title="Manage your Claude Code projects & sessions">⚙ Manage ▾</button>
         {#if menuOpen}
           <div class="dropdown" role="menu">
             <button class="select" onclick={() => openP('projects')}>Projects &amp; components</button>
@@ -336,7 +350,7 @@
       </div>
 
       <div class="menu-wrap">
-        <button class="select" onclick={() => { optsOpen = !optsOpen; menuOpen = false; bellOpen = false; }} title="Settings, appearance & token conservation">⚙ Settings ▾</button>
+        <button class="select" data-tour="settings" onclick={() => { optsOpen = !optsOpen; menuOpen = false; bellOpen = false; }} title="Settings, appearance & token conservation">⚙ Settings ▾</button>
         {#if optsOpen}
           <div class="dropdown opts" role="menu">
             <div class="opt-sec">Appearance</div>
@@ -409,8 +423,9 @@
   <TranscriptPanel bind:sessionId={transcriptId} />
   {#if tileModalId}<AgentModal id={tileModalId} onClose={() => (tileModalId = null)} />{/if}
   <NewTask bind:open={newTaskOpen} />
+  <Tour bind:open={tourOpen} steps={tourSteps} />
 
-  <div class="statusbar">
+  <div class="statusbar" data-tour="status">
     <strong>{selectedProject || 'All open projects'}</strong>
     <span>· {sessionCount} session{sessionCount === 1 ? '' : 's'} · {shown.length} agent{shown.length === 1 ? '' : 's'}</span>
     {#if usage?.totals}<span class="cost" title="Estimated from ~/.claude transcripts">💰 today ${todayCost?.toFixed(2) ?? '0.00'} · total ${usage.totals.costUSD.toFixed(0)}</span>{/if}
