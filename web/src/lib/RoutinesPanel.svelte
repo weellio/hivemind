@@ -1,5 +1,12 @@
 <script>
+  import { ttsAvailable, speak, stopSpeaking } from './tts.js';
   let { open = $bindable(false) } = $props();
+  let speakingId = $state(null);
+  function listen(b) {
+    if (speakingId === b.id) { stopSpeaking(); speakingId = null; return; }
+    const ok = speak(b.output, { onend: () => { if (speakingId === b.id) speakingId = null; } });
+    speakingId = ok ? b.id : null;
+  }
   let _was = false;
   $effect(() => { if (open && !_was) openPanel(); _was = open; });
 
@@ -136,10 +143,13 @@
       {#if briefings.length === 0}<div class="empty">No briefings yet — run a routine.</div>{/if}
       {#each briefings as b (b.id)}
         <div class="bf" class:bad={!b.ok}>
-          <button class="bf-top" onclick={() => (expanded = { ...expanded, [b.id]: !expanded[b.id] })}>
-            <span class="bf-name">{b.ok ? '📋' : '⚠'} {b.name}</span>
-            <span class="bf-meta">{b.project ? b.project + ' · ' : ''}{rel(b.ts)} · {dur(b.ms)}</span>
-          </button>
+          <div class="bf-top">
+            <button class="bf-exp" onclick={() => (expanded = { ...expanded, [b.id]: !expanded[b.id] })}>
+              <span class="bf-name">{b.ok ? '📋' : '⚠'} {b.name}</span>
+              <span class="bf-meta">{b.project ? b.project + ' · ' : ''}{rel(b.ts)} · {dur(b.ms)}</span>
+            </button>
+            {#if b.ok && ttsAvailable}<button class="bf-listen" class:on={speakingId === b.id} onclick={() => listen(b)} title="Read aloud">{speakingId === b.id ? '⏹' : '🔊'}</button>{/if}
+          </div>
           {#if expanded[b.id]}
             <pre class="bf-out">{b.ok ? b.output : (b.error || '(no output)')}</pre>
           {/if}
@@ -193,8 +203,11 @@
 
   .bf { border: 0.5px solid var(--color-border-tertiary); border-radius: 8px; margin-bottom: 6px; overflow: hidden; }
   .bf.bad { border-color: #EF444455; }
-  .bf-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; background: none; border: none; cursor: pointer; padding: 8px 10px; text-align: left; color: var(--color-text-primary); }
-  .bf-top:hover { background: var(--color-background-secondary); }
+  .bf-top { display: flex; align-items: center; gap: 4px; }
+  .bf-exp { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: none; border: none; cursor: pointer; padding: 8px 10px; text-align: left; color: var(--color-text-primary); }
+  .bf-exp:hover { background: var(--color-background-secondary); }
+  .bf-listen { background: none; border: none; cursor: pointer; font-size: 13px; padding: 6px 9px; color: var(--color-text-tertiary); }
+  .bf-listen:hover, .bf-listen.on { color: var(--accent, #6366F1); }
   .bf-name { font-size: 12px; font-weight: 500; }
   .bf-meta { font-size: 9px; color: var(--color-text-tertiary); white-space: nowrap; font-family: var(--font-mono); }
   .bf-out { margin: 0; padding: 10px; font-size: 11.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-word;

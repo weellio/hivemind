@@ -1,7 +1,8 @@
 <script>
   import { onMount } from 'svelte';
   import { STATE_COLORS, STATE_LABEL } from './lib/states.js';
-  import { avatarMode, layout, images, soundOn, autoUsage, fastPoll, animations, desktopNotify, costAlerts } from './lib/stores.js';
+  import { avatarMode, layout, images, soundOn, autoUsage, fastPoll, animations, desktopNotify, costAlerts, briefAloud } from './lib/stores.js';
+  import { speak as ttsSpeak } from './lib/tts.js';
   import AgentTile from './lib/AgentTile.svelte';
   import AgentModal from './lib/AgentModal.svelte';
   import NewTask from './lib/NewTask.svelte';
@@ -147,6 +148,7 @@
     if (latestBrief && latestBrief.ts > _briefTs) {
       const first = _briefTs === 0; _briefTs = latestBrief.ts;
       if (!first && latestBrief.ok && $desktopNotify) notifyDesktop({ name: '📋 ' + latestBrief.name, project: 'briefing ready' });
+      if (!first && latestBrief.ok && $briefAloud) ttsSpeak((latestBrief.name + '. ') + latestBrief.output);
     }
   });
   const tourSteps = [
@@ -402,6 +404,7 @@
             <label class="opt"><input type="checkbox" checked={$desktopNotify} onchange={toggleNotify} /> Desktop notifications <span class="dim">(when waiting)</span></label>
             <label class="opt"><input type="checkbox" bind:checked={$autoUsage} /> Auto-refresh cost <span class="dim">(re-reads transcripts)</span></label>
             <label class="opt"><input type="checkbox" bind:checked={$costAlerts} /> Cost &amp; burn alerts <span class="dim">(tile $ + runaway flag)</span></label>
+            <label class="opt"><input type="checkbox" bind:checked={$briefAloud} /> Read new briefings aloud <span class="dim">(🔊 text-to-speech)</span></label>
             <label class="opt"><input type="checkbox" bind:checked={$fastPoll} /> Fast agent updates <span class="dim">(0.5s vs 2s)</span></label>
             <label class="opt"><input type="checkbox" bind:checked={$animations} /> Office animations <span class="dim">(CPU)</span></label>
           </div>

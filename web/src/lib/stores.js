@@ -19,3 +19,4 @@ export const fastPoll = persisted('aoc-fast-poll', true);         // poll agent 
 export const animations = persisted('aoc-animations', true);      // office micro-animations (wandering, water cooler, chatter)
 export const desktopNotify = persisted('aoc-desktop-notify', false); // browser Notification when an agent needs input
 export const costAlerts = persisted('aoc-cost-alerts', true);     // show per-agent cost chips + the red "runaway" burn highlight
+export const briefAloud = persisted('aoc-brief-aloud', false);    // read a new briefing aloud (TTS) when it lands
