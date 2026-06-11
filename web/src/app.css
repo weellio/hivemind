@@ -33,6 +33,10 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: var(--font-sans); background: var(--color-background-secondary); color: var(--color-text-primary); }
 
+/* Native checkboxes / sliders / radios follow the chosen accent — not the OS
+   default (which is why they used to look orange against a green accent). */
+input[type="checkbox"], input[type="range"], input[type="radio"] { accent-color: var(--accent, #6366f1); }
+
 /* One modern look for every pill button + select across the app. */
 .select {
   font: 500 12px/1.4 var(--font-sans);

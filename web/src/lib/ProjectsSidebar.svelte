@@ -350,8 +350,9 @@
   .phead { display: flex; align-items: center; }
   .proj.muted { opacity: 0.5; }
   .mute { background: none; border: none; cursor: pointer; font-size: 12px; padding: 4px 8px; flex-shrink: 0; filter: grayscale(0.3); }
-  .prow { display: flex; align-items: center; gap: 7px; flex: 1 1 auto; min-width: 0; background: none; border: none; cursor: pointer; padding: 7px 6px; text-align: left; color: var(--color-text-primary); }
-  .caret { color: var(--color-text-tertiary); font-size: 10px; width: 10px; }
+  .prow { display: flex; align-items: center; gap: 7px; flex: 1 1 auto; min-width: 0; background: none; border: none; cursor: pointer; padding: 7px 6px; text-align: left; color: var(--color-text-primary); border-radius: 6px; }
+  .prow:hover { background: var(--color-background-secondary); }
+  .caret { color: var(--accent, #6366F1); font-size: 11px; width: 12px; flex-shrink: 0; }
   .pname { flex: 1 1 auto; font-size: 12px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .run { font-size: 9px; color: #10B981; }
   .counts { font-size: 9px; color: var(--color-text-tertiary); font-family: var(--font-mono); }

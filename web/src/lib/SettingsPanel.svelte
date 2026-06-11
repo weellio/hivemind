@@ -349,8 +349,10 @@
   .chips { display: flex; flex-wrap: wrap; gap: 3px; }
   .chip { font-size: 9px; padding: 1px 6px; border-radius: 99px; border: 0.5px solid var(--color-border-tertiary); background: var(--color-background-secondary); color: var(--color-text-tertiary); }
   .mono { font-family: var(--font-mono); }
-  .collapser { display: flex; align-items: center; gap: 5px; background: none; border: none; cursor: pointer; font-size: 11px; color: var(--color-text-secondary); padding: 0; }
-  .caret { color: var(--color-text-tertiary); font-size: 10px; width: 10px; }
+  .collapser { display: flex; align-items: center; gap: 7px; width: 100%; background: none; border: none; cursor: pointer;
+    font-size: 12.5px; font-weight: 600; color: var(--color-text-primary); padding: 4px 2px; text-align: left; border-radius: 6px; }
+  .collapser:hover { background: var(--color-background-secondary); }
+  .caret { color: var(--accent, #6366F1); font-size: 11px; width: 12px; flex-shrink: 0; }
   .raw { margin-top: 8px; font-size: 10px; color: var(--color-text-secondary); background: var(--color-background-secondary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); padding: 8px 10px; overflow: auto; max-height: 300px; white-space: pre; }
   .statusbar { border-top: 0.5px solid var(--color-border-tertiary); padding: 8px 14px; font-size: 11px; color: var(--color-text-secondary); background: var(--color-background-secondary); }
   .tg { padding: 8px 14px; border-bottom: 0.5px solid var(--color-border-tertiary); }
