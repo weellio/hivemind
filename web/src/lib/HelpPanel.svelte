@@ -30,7 +30,8 @@
       title: 'Manage ▾ — Projects',
       items: [
         ['All projects', 'Every Claude project — running, recently active, or discovered from folders you add (typed path or native picker).'],
-        ['Components', 'Browse each project’s skills, agents, commands, hooks & MCP servers — and copy any of them to another project or your global ~/.claude (with overwrite confirm).'],
+        ['Components', 'Browse each project’s skills, agents & commands — and copy any of them to another project or your global ~/.claude (with overwrite confirm).'],
+        ['Hooks · MCP · settings.json', 'Expand a project to manage its hooks (view + delete), MCP servers (add from presets, remove) and raw settings.json — inline, where the project lives. (Replaced the old separate Config panel.)'],
         ['Git status', 'Per-project ⎇ branch · dirty · ahead/behind badge.'],
         ['▶ Start', 'Launch a Claude session in a terminal there — optionally seeded with a task.'],
         ['Pull · Diff · Branches · Commit & Push', 'Full source-control inline: view the diff, switch/create branches, and commit + push.'],
@@ -41,7 +42,7 @@
       items: [
         ['Usage / cost', 'Token & cost analytics from your transcripts: totals, 30-day chart, per-project/model, priciest sessions.'],
         ['GitHub', 'Open PRs & issues per project (★ stars · ⑂ forks), click to open in the browser, and create a pull request.'],
-        ['Config', 'View a project’s hooks, MCP servers & raw settings; add or delete an MCP server, delete a hook — plus set up Telegram (live, no restart).'],
+        ['App configuration', 'Settings ▾ → App configuration: the app-wide stuff — Telegram, cost budget, new-session options, idle nudge, editor command (live, no restart).'],
         ['Routines & briefings', 'Save reusable prompts (that can call skills/MCP), Run now or schedule daily. They run headlessly and post their output as a “briefing” — a morning brief, a nightly digest, etc. A fresh one greets you with a card.'],
         ['Session history', 'Recent sessions across all projects with their first prompt — View the transcript or ▶ Resume any one.'],
         ['Search', 'Search across every session transcript + project — find which session touched a file or topic, then open it.'],
@@ -53,9 +54,9 @@
     {
       title: 'Options & alerts',
       items: [
-        ['Conserve tokens', 'Hivemind sends almost nothing to the model itself — the real per-turn cost is the MCP servers / skills a project loads. Trim them in Config.'],
+        ['Conserve tokens', 'Hivemind sends almost nothing to the model itself — the real per-turn cost is the MCP servers / skills a project loads. Trim them per project: Manage → Projects → expand a project → MCP servers.'],
         ['Audit your context', 'Install ships a context-audit skill — in any session just ask “audit my context” or “trim my CLAUDE.md”. It reads each session’s cache-hit / context-fill, ranks what’s re-sent every turn (CLAUDE.md, MCP tool schemas, skills, memory), and proposes concrete cuts + a leaner CLAUDE.md.'],
-        ['Cost budget', 'Set a daily / per-session spend cap (in Config) — get a banner + Telegram alert when crossed.'],
+        ['Cost budget', 'Set a daily / per-session spend cap (Settings → App configuration) — get a banner + Telegram alert when crossed.'],
         ['Performance toggles', 'Alert sound, desktop notifications, auto-refresh cost, fast agent updates, and office animations.'],
         ['Status bar', 'Today’s + total spend is always visible.'],
         ['Telegram', 'Get pinged when a session is waiting, and reply or /stop from your phone.'],
@@ -72,7 +73,7 @@
         ['Skip permission prompts', 'Settings → New session options → “skip ALL prompts” launches with --dangerously-skip-permissions, so Claude won’t ask before edits/commands. Only use it on projects you trust.'],
         ['Sub-agents show no dollar amount', 'Cost is tracked per session (one transcript). A sub-agent’s spend is part of its parent session, so only the session (root) carries the figure.'],
         ['Why does a session show “$X/min”?', 'Spend is estimated from token counts at API list prices — on a Max/subscription plan you aren’t literally paying that. Treat it as a relative “spending fast” signal.'],
-        ['Replies aren’t instant', 'Replies are queued and delivered when the session next runs a turn. Turn on Config → Wake idle sessions to nudge a parked session so it picks up your reply right away.'],
+        ['Replies aren’t instant', 'Replies are queued and delivered when the session next runs a turn. Turn on Settings → App configuration → Wake idle sessions to nudge a parked session so it picks up your reply right away.'],
         ['Routine email/calendar didn’t work', 'Routines run headlessly (claude -p). Interactively-authenticated MCP (claude.ai Gmail/Calendar connectors) often isn’t available unattended; skills and token-based MCP are fine. Use Run now to see what’s available, and keep briefing routines read-only.'],
       ],
     },
