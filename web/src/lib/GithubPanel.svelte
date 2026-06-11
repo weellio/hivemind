@@ -213,18 +213,8 @@
 {/if}
 
 <style>
-  .ov { position: fixed; inset: 0; z-index: 90; background: rgba(0, 0, 0, 0.25); }
-  .drawer {
-    position: fixed; top: 0; right: 0; bottom: 0; z-index: 91; width: 400px; max-width: 94vw;
-    background: var(--color-background-primary); border-left: 0.5px solid var(--color-border-secondary);
-    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.18); display: flex; flex-direction: column;
-  }
-  .hd {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 12px 14px; border-bottom: 0.5px solid var(--color-border-tertiary); flex-shrink: 0;
-  }
+  .drawer { --drawer-w: 400px; }   /* shell (.ov/.drawer/.hd/.x) is shared in app.css */
   .hd-actions { display: flex; align-items: center; gap: 8px; }
-  .x { background: none; border: none; cursor: pointer; font-size: 14px; color: var(--color-text-tertiary); }
   .mini {
     font-size: 10px; padding: 2px 8px; border-radius: 6px; cursor: pointer;
     border: 0.5px solid var(--color-border-secondary); background: var(--color-background-secondary);

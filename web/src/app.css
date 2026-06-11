@@ -71,7 +71,7 @@ select.select {
   background: var(--color-background-primary); border-left: 0.5px solid var(--color-border-secondary);
   box-shadow: -4px 0 24px rgba(0, 0, 0, 0.18); display: flex; flex-direction: column;
 }
-.hd { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 0.5px solid var(--color-border-tertiary); }
+.hd { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 0.5px solid var(--color-border-tertiary); flex-shrink: 0; }
 .hd strong { font-size: 14px; }
 .x { background: none; border: none; cursor: pointer; font-size: 14px; color: var(--color-text-tertiary); transition: color .12s ease; }
 .x:hover { color: var(--color-text-primary); }

@@ -109,32 +109,8 @@
 {/if}
 
 <style>
-  .ov {
-    position: fixed; inset: 0; z-index: 90;
-    background: rgba(0, 0, 0, 0.25);
-  }
-  .drawer {
-    position: fixed; top: 0; right: 0; bottom: 0; z-index: 91;
-    width: 400px; max-width: 95vw;
-    background: var(--color-background-primary);
-    border-left: 0.5px solid var(--color-border-secondary);
-    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.18);
-    display: flex; flex-direction: column;
-    border-radius: var(--border-radius-lg) 0 0 var(--border-radius-lg);
-  }
-  .hd {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 12px 14px;
-    border-bottom: 0.5px solid var(--color-border-tertiary);
-    flex-shrink: 0;
-  }
-  .hd strong { font-size: 13px; color: var(--color-text-primary); }
+  .drawer { --drawer-w: 400px; }   /* shell (.ov/.drawer/.hd/.x) is shared in app.css */
   .hd-right { display: flex; align-items: center; gap: 6px; }
-  .x {
-    background: none; border: none; cursor: pointer;
-    font-size: 14px; color: var(--color-text-tertiary);
-    padding: 2px 5px;
-  }
   .toggle {
     font-size: 10px; padding: 3px 9px;
     border-radius: var(--border-radius-md);
