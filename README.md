@@ -11,6 +11,8 @@ It attaches to any project automatically via Claude Code **hooks** — no manual
 <p align="center"><img src="docs/demo.webp" alt="Hivemind in action" width="820" /></p>
 <p align="center"><em>idle · thinking · coding · spawning · reading · testing · error · done — every agent, live.</em></p>
 
+<p align="center"><a href="https://youtu.be/URRkwBjsVmQ"><strong>📺 Watch the demo</strong></a> — running a dozen Claude Code agents at once</p>
+
 <p align="center"><a href="https://www.paypal.com/ncp/payment/G8NNLNUHD6SFW"><img src="https://img.shields.io/badge/%E2%98%95_Buy_me_a_coffee-PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white" alt="Buy me a coffee" /></a></p>
 
 ## What you get
