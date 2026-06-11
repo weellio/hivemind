@@ -1,5 +1,5 @@
 <script>
-  let { open = $bindable(false), scope = 'project' } = $props();   // 'app' = global settings · 'project' = this project's config
+  let { open = $bindable(false), scope = 'project', projectCwd = '' } = $props();   // 'app' = global settings · 'project' = this project's config (projectCwd preselects it)
   let _wasOpen = false;
   $effect(() => { if (open && !_wasOpen) openPanel(); _wasOpen = open; });
   let projects = $state([]);
@@ -27,7 +27,7 @@
     loading = false;
   }
 
-  function openPanel() { open = true; cfg = null; cwd = ''; rawOpen = false; status = ''; loadProjects(); loadTg(); loadBudget(); loadEditor(); loadClaude(); loadNudge(); }
+  function openPanel() { open = true; cfg = null; cwd = (scope === 'project' && projectCwd) ? projectCwd : ''; rawOpen = false; status = ''; loadProjects(); loadTg(); loadBudget(); loadEditor(); loadClaude(); loadNudge(); if (cwd) loadConfig(); }
 
   // ── cost budget (global) ──
   let bud = $state(null); let budDaily = $state(''); let budSession = $state(''); let budStatus = $state(''); let budOpen = $state(false);

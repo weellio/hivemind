@@ -138,7 +138,11 @@
   // sessions, nudge, editor) opened from Settings ▾, and 'project' (this project's
   // hooks/MCP/settings.json) opened from Manage → Project config.
   let settingsScope = $state('project');
+  let settingsCwd = $state('');
   function openConfig(scope) { settingsScope = scope; panels.config = true; menuOpen = false; optsOpen = false; }
+  // Open project config pre-targeted to a project — invoked from the Projects panel's
+  // per-project ⚙ Config button, so project config lives where the project does.
+  function openProjectConfig(cwd) { settingsCwd = cwd; settingsScope = 'project'; panels.config = true; panels.projects = false; menuOpen = false; optsOpen = false; }
   let transcriptId = $state(null);
   let tileModalId = $state(null);   // mosaic tile → full agent modal
   let newTaskOpen = $state(false);  // ＋ New task launcher
@@ -368,10 +372,9 @@
         <button class="select" data-tour="manage" onclick={() => { menuOpen = !menuOpen; optsOpen = false; }} title="Manage your Claude Code projects & sessions">⚙ Manage ▾</button>
         {#if menuOpen}
           <div class="dropdown" role="menu">
-            <button class="select" onclick={() => openP('projects')}>Projects &amp; components</button>
+            <button class="select" onclick={() => openP('projects')}>Projects · components · config</button>
             <button class="select" onclick={() => openP('usage')}>Usage / cost</button>
             <button class="select" onclick={() => openP('github')}>GitHub</button>
-            <button class="select" onclick={() => openConfig('project')}>Project config (hooks · MCP)</button>
             <button class="select" onclick={() => openP('routines')}>Routines &amp; briefings</button>
             <button class="select" onclick={() => openP('history')}>Session history</button>
             <button class="select" onclick={() => openP('search')}>Search</button>
@@ -409,7 +412,7 @@
 
             <div class="opt-sec">Conserve Claude tokens</div>
             <p class="opt-note">Hivemind sends almost nothing to the model on its own. The real per-turn cost is the <b>MCP servers, skills &amp; agents</b> each project loads — trim ones you don't need.</p>
-            <button class="select" onclick={() => openConfig('project')}>Manage MCP &amp; skills →</button>
+            <button class="select" onclick={() => { openP('projects'); optsOpen = false; }}>Trim MCP &amp; skills (in Projects) →</button>
             <div class="opt-sec">Share</div>
             <button class="select" onclick={() => { exportSnapshot(); optsOpen = false; }}>📷 Export swarm snapshot <span class="dim">(Mermaid + PNG of the floor)</span></button>
 
@@ -459,10 +462,10 @@
   {#if exportMsg}<div class="toast">{exportMsg}</div>{/if}
 
   <!-- always-mounted panels, opened from the Manage menu (drawers are position:fixed) -->
-  <ProjectsSidebar bind:open={panels.projects} />
+  <ProjectsSidebar bind:open={panels.projects} onConfig={openProjectConfig} />
   <CostPanel bind:open={panels.usage} />
   <GithubPanel bind:open={panels.github} />
-  <SettingsPanel bind:open={panels.config} scope={settingsScope} />
+  <SettingsPanel bind:open={panels.config} scope={settingsScope} projectCwd={settingsCwd} />
   <HistoryPanel bind:open={panels.history} onView={(sid) => (transcriptId = sid)} />
   <RoutinesPanel bind:open={panels.routines} />
   <HealthPanel bind:open={panels.health} />

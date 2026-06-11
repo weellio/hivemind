@@ -1,6 +1,6 @@
 <script>
   import ComponentBuilder from './ComponentBuilder.svelte';
-  let { open = $bindable(false) } = $props();
+  let { open = $bindable(false), onConfig } = $props();
   let _wasOpen = false;
   $effect(() => { if (open && !_wasOpen) openPanel(); _wasOpen = open; });
   let data = $state({ roots: [], projects: [] });
@@ -211,6 +211,7 @@
                 <input class="cm" placeholder="task (optional)…" bind:value={startPrompt[p.path]} onkeydown={(e) => e.key === 'Enter' && launch(p)} />
                 <button class="select" onclick={() => openIn(p, 'folder')} title="Open folder">📂</button>
                 <button class="select" onclick={() => openIn(p, 'editor')} title="Open in VS Code">Code</button>
+                <button class="select" onclick={() => onConfig && onConfig(p.path)} title="This project's hooks · MCP servers · settings.json">⚙ Config</button>
                 {#if gitMap[p.path]?.isRepo}
                   <button class="select" onclick={() => gitDo(p, 'pull')} disabled={!!busy} title="git pull">⬇ Pull</button>
                   <button class="select" onclick={() => gitDiff(p)} disabled={!!busy} title="git diff">Diff</button>
