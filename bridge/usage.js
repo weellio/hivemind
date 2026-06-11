@@ -20,14 +20,44 @@ const PRICING = {
   opus:   { input: 15, output: 75, cacheWrite: 18.75, cacheRead: 1.50 },
   sonnet: { input: 3,  output: 15, cacheWrite: 3.75,  cacheRead: 0.30 },
   haiku:  { input: 1,  output: 5,  cacheWrite: 1.25,  cacheRead: 0.10 },
+  fable:  { input: 10, output: 50, cacheWrite: 12.50, cacheRead: 1.00 },  // Fable 5 / Mythos 5
 };
+const ZERO = { input: 0, output: 0, cacheWrite: 0, cacheRead: 0 };
 
-function rateFor(model) {
+// Optional per-model price overrides from bridge/aoc-config.json, so non-Anthropic
+// or local backends (e.g. routed through claude-code-router) get priced correctly:
+//   { "pricing": { "deepseek": { "input": 0.27, "output": 1.10 },
+//                  "gemini-2.5-flash": { "input": 0.30, "output": 2.50 } } }
+// Keys match as case-insensitive substrings of the model id (first hit wins);
+// cacheWrite/cacheRead default to 1.25x / 0.1x input if you omit them.
+const CONFIG_PATH = path.join(__dirname, 'aoc-config.json');
+function pricingOverrides() {
+  try { const c = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')); return c && c.pricing && typeof c.pricing === 'object' ? c.pricing : {}; }
+  catch (_) { return {}; }
+}
+function normRate(r) {
+  r = r || {};
+  const inp = Number(r.input) || 0;
+  return {
+    input: inp,
+    output: Number(r.output) || 0,
+    cacheWrite: r.cacheWrite != null ? Number(r.cacheWrite) || 0 : inp * 1.25,
+    cacheRead: r.cacheRead != null ? Number(r.cacheRead) || 0 : inp * 0.1,
+  };
+}
+
+function rateFor(model, overrides) {
   const m = String(model || '').toLowerCase();
+  if (overrides) {
+    for (const key of Object.keys(overrides)) {
+      if (key && m.includes(String(key).toLowerCase())) return normRate(overrides[key]);
+    }
+  }
   if (m.includes('opus')) return PRICING.opus;
   if (m.includes('sonnet')) return PRICING.sonnet;
   if (m.includes('haiku')) return PRICING.haiku;
-  return PRICING.sonnet; // default
+  if (m.includes('fable') || m.includes('mythos')) return PRICING.fable;
+  return ZERO;   // non-Claude / local / unknown → unpriced unless set in config.pricing
 }
 
 // Context window (tokens) per model — for the "how full / near auto-compact" gauge.
@@ -42,8 +72,8 @@ function contextMaxFor(model, observed) {
   return 200000;
 }
 
-function costOf(model, input, output, cacheWrite, cacheRead) {
-  const r = rateFor(model);
+function costOf(model, input, output, cacheWrite, cacheRead, overrides) {
+  const r = rateFor(model, overrides);
   return (
     (input / 1e6) * r.input +
     (output / 1e6) * r.output +
@@ -163,6 +193,7 @@ function projKey(p) { return process.platform === 'win32' ? String(p).toLowerCas
 async function build() {
   const root = projectsRoot();
   const entries = listJsonlFiles(root);
+  const overrides = pricingOverrides();   // per-model price overrides (config) — for non-Claude backends
 
   const totals = {
     inputTokens: 0,
@@ -205,7 +236,7 @@ async function build() {
       const cwd = canonPath(o.cwd || decodeDirName(entry.dir));
       const ts = o.timestamp || null;
       const tokens = input + output + cacheWrite + cacheRead;
-      const cost = costOf(model, input, output, cacheWrite, cacheRead);
+      const cost = costOf(model, input, output, cacheWrite, cacheRead, overrides);
 
       // totals
       totals.inputTokens += input;
@@ -264,7 +295,7 @@ async function build() {
       s.output += output;
       s.cacheWrite += cacheWrite;
       s.cacheRead += cacheRead;
-      s.outputCost += (output / 1e6) * rateFor(model).output;
+      s.outputCost += (output / 1e6) * rateFor(model, overrides).output;
       if (ts && (!s.lastActive || ts > s.lastActive)) s.lastActive = ts;
       // Latest turn's context size = everything fed to the model that turn
       // (fresh input + cache write + cache read). Tracks the most recent turn so
