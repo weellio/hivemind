@@ -134,6 +134,11 @@
   let optsOpen = $state(false);
   let panels = $state({ projects: false, usage: false, github: false, config: false, history: false, health: false, feed: false, search: false, routines: false, procs: false });
   function openP(k) { panels[k] = true; menuOpen = false; }
+  // Settings/Config is one drawer with two scopes: 'app' (global: Telegram, budget,
+  // sessions, nudge, editor) opened from Settings ▾, and 'project' (this project's
+  // hooks/MCP/settings.json) opened from Manage → Project config.
+  let settingsScope = $state('project');
+  function openConfig(scope) { settingsScope = scope; panels.config = true; menuOpen = false; optsOpen = false; }
   let transcriptId = $state(null);
   let tileModalId = $state(null);   // mosaic tile → full agent modal
   let newTaskOpen = $state(false);  // ＋ New task launcher
@@ -366,7 +371,7 @@
             <button class="select" onclick={() => openP('projects')}>Projects &amp; components</button>
             <button class="select" onclick={() => openP('usage')}>Usage / cost</button>
             <button class="select" onclick={() => openP('github')}>GitHub</button>
-            <button class="select" onclick={() => openP('config')}>Config (hooks · MCP)</button>
+            <button class="select" onclick={() => openConfig('project')}>Project config (hooks · MCP)</button>
             <button class="select" onclick={() => openP('routines')}>Routines &amp; briefings</button>
             <button class="select" onclick={() => openP('history')}>Session history</button>
             <button class="select" onclick={() => openP('search')}>Search</button>
@@ -399,9 +404,12 @@
             </div>
             <input bind:this={bgFileInput} type="file" accept="image/*" style="display:none" onchange={onBgImage} />
 
+            <div class="opt-sec">App configuration</div>
+            <button class="select" onclick={() => openConfig('app')}>Telegram · cost budget · sessions · nudge →</button>
+
             <div class="opt-sec">Conserve Claude tokens</div>
             <p class="opt-note">Hivemind sends almost nothing to the model on its own. The real per-turn cost is the <b>MCP servers, skills &amp; agents</b> each project loads — trim ones you don't need.</p>
-            <button class="select" onclick={() => { openP('config'); optsOpen = false; }}>Manage MCP &amp; skills →</button>
+            <button class="select" onclick={() => openConfig('project')}>Manage MCP &amp; skills →</button>
             <div class="opt-sec">Share</div>
             <button class="select" onclick={() => { exportSnapshot(); optsOpen = false; }}>📷 Export swarm snapshot <span class="dim">(Mermaid + PNG of the floor)</span></button>
 
@@ -454,7 +462,7 @@
   <ProjectsSidebar bind:open={panels.projects} />
   <CostPanel bind:open={panels.usage} />
   <GithubPanel bind:open={panels.github} />
-  <SettingsPanel bind:open={panels.config} />
+  <SettingsPanel bind:open={panels.config} scope={settingsScope} />
   <HistoryPanel bind:open={panels.history} onView={(sid) => (transcriptId = sid)} />
   <RoutinesPanel bind:open={panels.routines} />
   <HealthPanel bind:open={panels.health} />

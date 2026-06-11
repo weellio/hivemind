@@ -1,5 +1,5 @@
 <script>
-  let { open = $bindable(false) } = $props();
+  let { open = $bindable(false), scope = 'project' } = $props();   // 'app' = global settings · 'project' = this project's config
   let _wasOpen = false;
   $effect(() => { if (open && !_wasOpen) openPanel(); _wasOpen = open; });
   let projects = $state([]);
@@ -127,9 +127,10 @@
 
 {#if open}
   <div class="ov" onclick={closePanel} role="presentation"></div>
-  <aside class="drawer" role="dialog" aria-label="Project config">
-    <div class="hd"><strong>Project Config</strong><button class="x" onclick={closePanel} aria-label="Close">✕</button></div>
+  <aside class="drawer" role="dialog" aria-label={scope === 'app' ? 'Settings' : 'Project config'}>
+    <div class="hd"><strong>{scope === 'app' ? 'Settings' : 'Project Config'}</strong><button class="x" onclick={closePanel} aria-label="Close">✕</button></div>
 
+    {#if scope === 'app'}
     <div class="tg">
       <button class="collapser" onclick={() => (tgOpen = !tgOpen)}>
         <span class="caret">{tgOpen ? '▾' : '▸'}</span> Telegram alerts
@@ -217,7 +218,9 @@
         </div>
       {/if}
     </div>
+    {/if}
 
+    {#if scope === 'project'}
     <div class="picker">
       <div class="lbl">Project</div>
       <select class="select wide" value={cwd} onchange={onProjectChange}>
@@ -311,6 +314,7 @@
 
       {/if}
     </div>
+    {/if}
 
     {#if status}
       <div class="statusbar">{status}</div>
