@@ -1,4 +1,4 @@
-<p align="center"><img src="web/public/logo.png" width="220" alt="Gander" /></p>
+<p align="center"><img src="web/public/logo.png" width="450" alt="Gander" /></p>
 
 # Gander
 
