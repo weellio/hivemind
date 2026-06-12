@@ -1,8 +1,10 @@
-<p align="center"><img src="web/public/logo.png" width="450" alt="Gander" /></p>
+<p align="center"><img src="web/public/gander.png" width="460" alt="Gander — take a gander at your agents" /></p>
 
 # Gander
 
-> *Agent Ops Center* — a NOC for everything your Claude Code agents are doing.
+> *Take a gander at your agents.* A NOC for everything your Claude Code agents are doing.
+
+<p align="center"><img src="web/public/logo.png" width="600" alt="The Gander NOC — a goose manager overseeing a floor of AI agents" /></p>
 
 A live, animated dashboard of your **Claude Code agents and sub-agents** — a Hollywood-Squares / Zoom-style grid where each agent is a pixel-art avatar that physically acts out what it's doing: thinking, reading, coding, spawning sub-agents, running tests, erroring, idling. Parent and child agents are linked with curved connectors carrying **animated packets that flow downward** to show information moving through the hierarchy.
 
