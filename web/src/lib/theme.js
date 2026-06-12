@@ -9,8 +9,8 @@ export const PRESETS = {
   forest:   { label: 'Forest',     vars: { '--color-background-primary': '#18241e', '--color-background-secondary': '#111a15', '--color-border-tertiary': '#27392f', '--color-border-secondary': '#3a5446', '--color-text-primary': '#e6f1ea', '--color-text-secondary': '#a3c2b1', '--color-text-tertiary': '#6c8a79' } },
   // Green-phosphor CRT — the IT-Crowd basement look. Sets a retro font + scanline overlay.
   // Tip: set your accent to #33FF66 for the full effect.
-  crt:      { label: 'CRT (IT Crowd)', font: '"VT323", ui-monospace, "Cascadia Code", monospace', scan: true,
-    vars: { '--color-background-primary': '#0b110c', '--color-background-secondary': '#070b07', '--color-border-tertiary': '#163a20', '--color-border-secondary': '#235a31', '--color-text-primary': '#9bf7b1', '--color-text-secondary': '#5fc97c', '--color-text-tertiary': '#3f8a55' } },
+  crt:      { label: 'CRT (IT Crowd)', font: '"Cascadia Code", "Consolas", ui-monospace, monospace', scan: true,
+    vars: { '--color-background-primary': '#0b110c', '--color-background-secondary': '#080d09', '--color-border-tertiary': '#1c4226', '--color-border-secondary': '#2c6c3b', '--color-text-primary': '#c8ffd6', '--color-text-secondary': '#83e49d', '--color-text-tertiary': '#5aa974' } },
 };
 
 // Background presets (CSS background-image + size). Sit behind the cards.

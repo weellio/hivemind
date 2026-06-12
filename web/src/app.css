@@ -1,5 +1,5 @@
-/* Retro fonts for the CRT (IT Crowd) theme — falls back to mono if offline. */
-@import url('https://fonts.googleapis.com/css2?family=VT323&family=Silkscreen&display=swap');
+/* Retro display font for the CRT (IT Crowd) theme header — body stays a crisp mono. */
+@import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
 
 :root {
   --color-background-primary: #ffffff;
@@ -79,10 +79,14 @@ select.select {
 .x { background: none; border: none; cursor: pointer; font-size: 14px; color: var(--color-text-tertiary); transition: color .12s ease; }
 .x:hover { color: var(--color-text-primary); }
 
-/* CRT (IT Crowd) theme effect — faint phosphor glow + scanlines. Opt-in: applyTheme
-   toggles body.crt-fx for the crt preset. The overlay is pointer-events:none. */
-body.crt-fx { text-shadow: 0 0 1px rgba(120, 255, 150, 0.28); }
+/* CRT (IT Crowd) theme effect. Opt-in: applyTheme toggles body.crt-fx for the crt
+   preset. Body text stays a crisp mono (no glow) for readability; the pixel font +
+   glow are reserved for the large top-bar title. Overlay is pointer-events:none. */
 body.crt-fx::after {
   content: ''; position: fixed; inset: 0; z-index: 9999; pointer-events: none;
-  background: repeating-linear-gradient(rgba(0, 0, 0, 0) 0, rgba(0, 0, 0, 0) 2px, rgba(8, 22, 10, 0.32) 3px);
+  background: repeating-linear-gradient(rgba(0, 0, 0, 0) 0, rgba(0, 0, 0, 0) 2px, rgba(8, 22, 10, 0.16) 3px);
+}
+body.crt-fx .title {
+  font-family: 'VT323', ui-monospace, monospace; font-size: 19px; letter-spacing: 0.5px;
+  text-shadow: 0 0 5px rgba(120, 255, 150, 0.45);
 }
