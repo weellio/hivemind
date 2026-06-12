@@ -334,7 +334,7 @@
 
   <header class="top-bar">
     <div class="title">
-      <img src="/logo.png" class="logo" alt="" />
+      <img src="/favicon.png" class="logo" alt="Gander" />
       <span class="dot" class:online></span>
       Gander · Agent NOC {online ? '— LIVE' : '— connecting…'}
     </div>
@@ -575,7 +575,7 @@
     min-width: 14px; height: 14px; border-radius: 99px; display: inline-flex; align-items: center; justify-content: center; padding: 0 3px; }
   .dropdown .dim { color: var(--color-text-tertiary); font-size: 10px; }
   .title { font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 8px; }
-  .title .logo { height: 22px; width: 22px; border-radius: 5px; object-fit: cover; }
+  .title .logo { height: 26px; width: 26px; object-fit: contain; }
   .dot { width: 8px; height: 8px; border-radius: 50%; background: #9CA3AF; }
   .dot.online { background: #10B981; animation: pulse 2s infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
