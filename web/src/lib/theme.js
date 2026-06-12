@@ -7,6 +7,10 @@ export const PRESETS = {
   midnight: { label: 'Midnight',   vars: { '--color-background-primary': '#1b2030', '--color-background-secondary': '#141826', '--color-border-tertiary': '#2a3550', '--color-border-secondary': '#3d4d72', '--color-text-primary': '#e9eefb', '--color-text-secondary': '#a7b2cc', '--color-text-tertiary': '#697493' } },
   slate:    { label: 'Slate',      vars: { '--color-background-primary': '#23262b', '--color-background-secondary': '#1a1d22', '--color-border-tertiary': '#343941', '--color-border-secondary': '#4a515c', '--color-text-primary': '#eceef2', '--color-text-secondary': '#aeb4bf', '--color-text-tertiary': '#777e8a' } },
   forest:   { label: 'Forest',     vars: { '--color-background-primary': '#18241e', '--color-background-secondary': '#111a15', '--color-border-tertiary': '#27392f', '--color-border-secondary': '#3a5446', '--color-text-primary': '#e6f1ea', '--color-text-secondary': '#a3c2b1', '--color-text-tertiary': '#6c8a79' } },
+  // Green-phosphor CRT — the IT-Crowd basement look. Sets a retro font + scanline overlay.
+  // Tip: set your accent to #33FF66 for the full effect.
+  crt:      { label: 'CRT (IT Crowd)', font: '"VT323", ui-monospace, "Cascadia Code", monospace', scan: true,
+    vars: { '--color-background-primary': '#0b110c', '--color-background-secondary': '#070b07', '--color-border-tertiary': '#163a20', '--color-border-secondary': '#235a31', '--color-text-primary': '#9bf7b1', '--color-text-secondary': '#5fc97c', '--color-text-tertiary': '#3f8a55' } },
 };
 
 // Background presets (CSS background-image + size). Sit behind the cards.
@@ -33,6 +37,10 @@ export function applyTheme(t) {
   const root = document.documentElement;
   for (const [k, v] of Object.entries(p.vars)) root.style.setProperty(k, v);
   root.style.setProperty('--accent', t.accent || '#6366F1');
+  // Per-theme font + CRT scanline effect (reset when switching back to a normal theme).
+  const DEFAULT_SANS = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+  root.style.setProperty('--font-sans', p.font || DEFAULT_SANS);
+  document.body.classList.toggle('crt-fx', !!p.scan);
   let css = '', size = 'cover';
   if (t.bgImage) { css = `url("${t.bgImage}")`; size = 'cover'; }
   else if (t.bg && BACKGROUNDS[t.bg]) { css = BACKGROUNDS[t.bg].css; size = BACKGROUNDS[t.bg].size; }
