@@ -67,6 +67,15 @@
   function runAll() { status = '⚙ compiling all routines headlessly…'; for (const r of routines) run(r); }
 
   let scheduled = $derived(routines.filter((r) => r.enabled && r.schedule).length);
+  async function delBrief(b) {
+    briefings = briefings.filter((x) => x.id !== b.id);   // optimistic
+    try { await fetch('/api/briefings/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: b.id }) }); } catch (_) {}
+  }
+  async function clearBriefs() {
+    if (!confirm('Delete all briefings? This cannot be undone.')) return;
+    briefings = [];
+    try { await fetch('/api/briefings/clear', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); } catch (_) {}
+  }
   let lastBrief = $derived(briefings[0]);
 </script>
 
@@ -142,7 +151,7 @@
         </div>
       {/each}
 
-      <div class="sec-h">Briefings</div>
+      <div class="sec-h">Briefings {#if briefings.length}<button class="clr" onclick={clearBriefs} title="Delete all briefings">clear all</button>{/if}</div>
       {#if briefings.length === 0}<div class="empty">No briefings yet — run a routine.</div>{/if}
       {#each briefings as b (b.id)}
         <div class="bf" class:bad={!b.ok}>
@@ -152,6 +161,7 @@
               <span class="bf-meta">{b.project ? b.project + ' · ' : ''}{rel(b.ts)} · {dur(b.ms)}</span>
             </button>
             {#if b.ok && ttsAvailable}<button class="bf-listen" class:on={speakingId === b.id} onclick={() => listen(b)} title="Read aloud">{speakingId === b.id ? '⏹' : '🔊'}</button>{/if}
+            <button class="bf-del" onclick={() => delBrief(b)} title="Delete this briefing" aria-label="Delete briefing">✕</button>
           </div>
           {#if expanded[b.id]}
             <pre class="bf-out">{b.ok ? b.output : (b.error || '(no output)')}</pre>
@@ -165,6 +175,10 @@
 <style>
   .drawer { --drawer-w: 460px; }   /* shell (.ov/.drawer/.hd/.x) is shared in app.css */
   .hd-actions { display: flex; align-items: center; gap: 8px; }
+  .bf-del { background: none; border: none; cursor: pointer; color: var(--color-text-tertiary); font-size: 12px; padding: 2px 5px; flex-shrink: 0; }
+  .bf-del:hover { color: var(--hm-err, #EF4444); }
+  .clr { background: none; border: none; cursor: pointer; color: var(--color-text-tertiary); font-size: 10px; text-transform: none; letter-spacing: 0; margin-left: 8px; }
+  .clr:hover { color: var(--hm-err, #EF4444); }
   .mini { font-size: 10px; padding: 3px 9px; border-radius: 6px; cursor: pointer; border: 0.5px solid var(--color-border-secondary); background: var(--color-background-secondary); color: var(--color-text-secondary); }
   .digest { padding: 7px 14px; font-size: 11px; color: var(--color-text-secondary); border-bottom: 0.5px solid var(--color-border-tertiary); background: var(--color-background-secondary); }
   .dim { color: var(--color-text-tertiary); }

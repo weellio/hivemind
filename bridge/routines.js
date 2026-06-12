@@ -61,6 +61,8 @@ function upsertRoutine(r) {
   return { ok: true, routine: clean };
 }
 function deleteRoutine(id) { routines = routines.filter((x) => x.id !== id); saveR(); return { ok: true }; }
+function deleteBriefing(id) { briefings = briefings.filter((b) => b.id !== id); saveB(); return { ok: true }; }
+function clearBriefings() { briefings = []; saveB(); return { ok: true }; }
 
 const running = new Set();   // routine ids currently running (avoid overlap)
 function isRunning(id) { return running.has(id); }
@@ -122,4 +124,4 @@ function tick(opts) {
   }
 }
 
-module.exports = { listRoutines, listBriefings, upsertRoutine, deleteRoutine, runRoutine, tick, isRunning };
+module.exports = { listRoutines, listBriefings, upsertRoutine, deleteRoutine, deleteBriefing, clearBriefings, runRoutine, tick, isRunning };

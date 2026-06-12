@@ -1162,6 +1162,14 @@ const server = http.createServer(async (req, res) => {
   if (url === '/api/briefings' && req.method === 'GET') {
     return sendJson(res, 200, { briefings: routines.listBriefings(80) });
   }
+  if (url === '/api/briefings/delete' && req.method === 'POST') {
+    const body = await readBody(req);
+    if (!body || !body.id) return sendJson(res, 400, { error: 'id required' });
+    return sendJson(res, 200, routines.deleteBriefing(body.id));
+  }
+  if (url === '/api/briefings/clear' && req.method === 'POST') {
+    return sendJson(res, 200, routines.clearBriefings());
+  }
 
   if (url === '/api/sendkeys' && req.method === 'POST') {
     const body = await readBody(req);
